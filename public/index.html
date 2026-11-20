@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Território Vivo: Crônicas de um ACS — RPG 2D</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-viewport">
+    <!-- 100% FULLSCREEN PIXEL ART CANVAS -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- TOP-LEFT: JOURNAL BUTTON, ACTIVE ROUTE TRACKER & TOASTS -->
+    <div id="hud-top-left">
+      <div class="hud-top-left-bar">
+        <button id="btn-journal" class="wood-icon-btn" title="Missão do Dia & Tablet e-SUS (TAB)">
+          <span class="journal-excl">!</span>
+          <span class="journal-label">e-SUS</span>
+          <span id="notif-badge" class="notif-badge">1</span>
+        </button>
+
+        <button id="btn-phone" class="wood-icon-btn" title="Celular Pessoal • Grupo da Vila & Contatos (C)">
+          <span class="journal-excl" style="background:#16a34a">📱</span>
+          <span class="journal-label">Vila</span>
+          <span id="phone-notif-badge" class="notif-badge">2</span>
+        </button>
+
+        <div class="wood-panel audio-control" title="Áudio & Paisagem Sonora (Tecla N para mutar)">
+          <button id="btn-mute" class="audio-mute-btn" aria-label="Alternar Áudio">🔊</button>
+          <input id="audio-volume" class="audio-slider" type="range" min="0" max="100" value="70" aria-label="Volume Geral">
+          <button id="btn-audio-settings" class="audio-settings-btn" aria-label="Configurar Volumes" title="Ajustar Música, Efeitos e Ambiente">🎚️</button>
+          <div id="audio-mixer-popover" class="wood-panel audio-mixer-popover hidden">
+            <div class="audio-mixer-row">
+              <span>🎵 Música</span>
+              <input id="music-volume" class="audio-slider" type="range" min="0" max="100" value="55" aria-label="Volume da Música">
+            </div>
+            <div class="audio-mixer-row">
+              <span>🔔 Efeitos</span>
+              <input id="sfx-volume" class="audio-slider" type="range" min="0" max="100" value="80" aria-label="Volume dos Efeitos">
+            </div>
+            <div class="audio-mixer-row">
+              <span>🌿 Ambiente</span>
+              <input id="ambience-volume" class="audio-slider" type="range" min="0" max="100" value="60" aria-label="Volume do Ambiente">
+            </div>
+          </div>
+        </div>
+
+        <div id="objective-tracker" class="wood-panel objective-tracker" title="Objetivo / Rota atual (clique para abrir o Mapa)">
+          <div class="tracker-head">
+            <span id="tracker-title" class="tracker-title">🏠 Carregando rota...</span>
+            <span id="tracker-dist" class="tracker-dist">--m</span>
+            <button id="btn-clear-pin" class="tracker-clear-btn hidden" title="Limpar marcador manual">✕</button>
+          </div>
+          <div id="tracker-sub" class="tracker-sub">Siga a seta dourada pela microárea</div>
+        </div>
+      </div>
+      <div id="story-hud-pill" class="wood-panel story-hud-pill" title="Missão Atual da História (clique para abrir o Diário 📖)">
+        <div class="story-hud-chapter" id="story-hud-chapter">📖 Prólogo — Primeira Prancheta</div>
+        <div class="story-hud-step" id="story-hud-step">📌 Converse com Joana na Sala ESF</div>
+      </div>
+      <div id="toast-container"></div>
+    </div>
+
+    <!-- CINEMATIC CHAPTER TRANSITION BANNER (Non-blocking) -->
+    <div id="chapter-banner" class="chapter-banner hidden">
+      <div class="wood-panel chapter-banner-inner">
+        <div id="chapter-banner-kicker" class="chapter-banner-kicker">📖 PRÓLOGO</div>
+        <div id="chapter-banner-title" class="chapter-banner-title">Primeira Prancheta</div>
+        <div id="chapter-banner-sub" class="chapter-banner-sub">Vila Esperança • Microárea 04</div>
+      </div>
+    </div>
+
+    <!-- TOP-RIGHT: COMPACT STARDEW-STYLE CLOCK, DAY, WEATHER & META PANEL -->
+    <div id="hud-top-right" class="wood-panel stardew-clock-box">
+      <div class="clock-row-top">
+        <span id="hud-day" class="day-text">Seg. • Dia 1/5</span>
+        <img id="hud-weather-img" class="pixel-img weather-icon" alt="Clima">
+      </div>
+      <div class="clock-divider"></div>
+      <div class="clock-row-mid">
+        <span id="hud-clock" class="clock-digits">07:00</span>
+        <span id="hud-weather-label" class="weather-sub">Sol Ameno</span>
+      </div>
+      <div id="hud-ubs-status" class="ubs-status-pill closed">🏥 UBS abre às 08h</div>
+      <div class="clock-divider"></div>
+      <div class="clock-row-bottom">
+        <span class="mini-stat" title="Meta Semanal de Visitas na Microárea">
+          🏠 <strong id="visits-text">0/15</strong>
+        </span>
+        <span class="mini-stat" title="Vínculo Médio da Microárea">
+          ❤️ <strong id="bond-text">42%</strong>
+        </span>
+      </div>
+    </div>
+
+    <!-- BOTTOM-LEFT: LIVE TERRITORIAL MINIMAP (CLICK FOR FULL MAP [M]) -->
+    <div id="hud-bottom-left" class="wood-panel minimap-box" title="Clique para abrir o Mapa Tático [M]">
+      <div class="minimap-header">
+        <span id="minimap-title">🗺️ Microárea 04</span>
+        <kbd>M</kbd>
+      </div>
+      <canvas id="minimap-canvas" width="196" height="118" class="pixel-img"></canvas>
+    </div>
+
+    <!-- BOTTOM-CENTER: WOODEN PIXEL-ART HOTBAR (MOCHILA DO ACS) -->
+    <div id="hud-bottom-center">
+      <div id="hotbar" class="wood-panel hotbar-frame">
+        <!-- Populated dynamically with pixel-art slots 1-4 + TAB + M -->
+      </div>
+      <div id="hotbar-tooltip" class="wood-tooltip hidden"></div>
+    </div>
+
+    <!-- BOTTOM-RIGHT: VERTICAL ENERGY & HYDRATION BARS (STARDEW STYLE) -->
+    <div id="hud-bottom-right">
+      <div class="vbar-wrapper" title="Energia / Fôlego (Descanse na sombra ou beba água)">
+        <div class="vbar-cap">⚡</div>
+        <div class="vbar-track">
+          <div id="stamina-bar" class="vbar-fill stamina-vfill" style="height: 100%"></div>
+        </div>
+        <div id="stamina-text" class="vbar-num">100</div>
+      </div>
+
+      <div class="vbar-wrapper" title="Hidratação / Proteção contra Insolação (Tecla 1: Água)">
+        <div class="vbar-cap">💧</div>
+        <div class="vbar-track">
+          <div id="hydration-bar" class="vbar-fill hydration-vfill" style="height: 100%"></div>
+        </div>
+        <div id="hydration-text" class="vbar-num">100</div>
+      </div>
+    </div>
+
+    <!-- STARDEW-STYLE BOTTOM DIALOGUE BOX (PORTRAIT + CHOICES) -->
+    <div id="dialogue-overlay" class="dialogue-overlay hidden">
+      <div class="wood-panel dialogue-box">
+        <div class="dialogue-left">
+          <div class="dlg-top-strip">
+            <span id="dlg-tag" class="dlg-tag">Casa 01 • Rua das Acácias</span>
+            <div id="dlg-badges" class="dlg-badges"></div>
+          </div>
+          <div id="dlg-text" class="dlg-text"></div>
+          <div id="dlg-clinical-note" class="dlg-clinical-note hidden"></div>
+          <div id="dlg-choices" class="dlg-choices"></div>
+        </div>
+
+        <div class="dialogue-right">
+          <div class="portrait-frame">
+            <canvas id="dlg-portrait-canvas" width="96" height="96" class="pixel-img"></canvas>
+          </div>
+          <div id="dlg-name" class="dlg-char-name">Dona Dulce</div>
+          <div id="dlg-hearts" class="dlg-hearts" title="Vínculo Familiar">❤️❤️❤️🤍🤍</div>
+          <div id="dlg-bond-val" class="dlg-bond-sub">75% (Confiante)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLET e-SUS TERRITÓRIO MODAL (TAB) -->
+    <div id="tablet-overlay" class="modal-overlay hidden">
+      <div class="wood-panel tablet-frame">
+        <div class="tablet-header">
+          <div class="tablet-brand">
+            <span class="sus-pill">+ SUS</span>
+            <strong>Tablet e-SUS Território • Microárea 04</strong>
+          </div>
+          <div class="tablet-tabs">
+            <button class="tab-btn active" data-tab="mission">📋 Missão do Dia</button>
+            <button class="tab-btn" data-tab="story">📖 História & Vínculos</button>
+            <button class="tab-btn" data-tab="families">🏠 15 Famílias & Horários</button>
+            <button class="tab-btn" data-tab="indicators">📊 Indicadores & Guia</button>
+          </div>
+          <button id="btn-close-tablet" class="wood-close-btn">✕ ESC</button>
+        </div>
+        <div id="tablet-content" class="tablet-content"></div>
+      </div>
+    </div>
+
+    <!-- PERSONAL SMARTPHONE MODAL (C) -->
+    <div id="phone-overlay" class="modal-overlay hidden">
+      <div class="wood-panel tablet-frame">
+        <div class="tablet-header">
+          <div class="tablet-brand">
+            <span class="sus-pill" style="background:#16a34a">VILA</span>
+            <strong>Celular Pessoal • Vila Esperança</strong>
+          </div>
+          <div class="tablet-tabs">
+            <button class="phone-tab-btn tab-btn active" data-phone-tab="group">💬 Grupo da Vila</button>
+            <button class="phone-tab-btn tab-btn" data-phone-tab="agenda">📅 Agenda da Semana</button>
+            <button class="phone-tab-btn tab-btn" data-phone-tab="contacts">👥 Contatos & Rotas</button>
+          </div>
+          <button id="btn-close-phone" class="wood-close-btn">✕ ESC</button>
+        </div>
+        <div id="phone-content" class="tablet-content"></div>
+      </div>
+    </div>
+
+    <!-- TACTICAL MAP MODAL (M) -->
+    <div id="map-overlay" class="modal-overlay hidden">
+      <div class="wood-panel map-frame">
+        <div class="tablet-header">
+          <div class="tablet-brand">
+            <span class="sus-pill">MAPA</span>
+            <strong>Mapa da Vila Esperança — Microárea 04</strong>
+          </div>
+          <button id="btn-close-map" class="wood-close-btn">✕ ESC</button>
+        </div>
+        <div class="map-body">
+          <canvas id="tactical-map-canvas" width="780" height="468" class="pixel-img"></canvas>
+          <div class="map-legend">
+            <h3>Legenda da Microárea</h3>
+            <ul>
+              <li><span class="lg-dot ubs"></span> <strong>UBS Vila Esperança</strong> (Água, mochila, relatório)</li>
+              <li><span class="lg-dot trail"></span> <strong>Estrada do Sol</strong> (Sem sombra — risco de insolação)</li>
+              <li><span class="lg-dot home"></span> <strong>Em Casa Agora</strong> (Horário conhecido)</li>
+              <li><span class="lg-dot unknown"></span> <strong>Horário a Descobrir</strong> (Bata ou pergunte aos amigos)</li>
+              <li><span class="lg-dot away"></span> <strong>Ausente / Trabalhando</strong></li>
+              <li><span class="lg-dot visited"></span> <strong>Visitada Hoje</strong></li>
+              <li><span class="lg-dot dog"></span> <strong>Cachorro Bravo</strong> (Use Petisco [4] ou contorne)</li>
+              <li><span class="lg-dot dengue"></span> <strong>Foco de Dengue</strong> (Vistoriar com [E])</li>
+            </ul>
+            <div class="parchment-tip">
+              💡 <strong>Dica de Rota:</strong> Visite trabalhadores cedo (08h–09h30) ou no fim da tarde (16h–18h). Passe na sombra das árvores e nos moradores amigos no sol forte!
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INTRO / DAY SUMMARY MODAL -->
+    <div id="summary-overlay" class="modal-overlay">
+      <div id="summary-card" class="wood-panel summary-card"></div>
+    </div>
+  </div>
+
+  <script src="js/core/engine.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/pixelArt.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/systems/musicDirector.js"></script>
+  <script src="js/systems/sceneManager.js"></script>
+  <script src="js/systems/navigation.js"></script>
+  <script src="js/systems/narrative.js"></script>
+  <script src="js/systems/storyState.js"></script>
+  <script src="js/systems/dialogue.js"></script>
+  <script src="js/systems/dialogueResolver.js"></script>
+  <script src="js/systems/worldState.js"></script>
+  <script src="js/systems/endingAssembler.js"></script>
+  <script src="js/systems/quests.js"></script>
+  <script src="js/systems/storyEvents.js"></script>
+  <script src="js/systems/schedule.js"></script>
+  <script src="js/systems/phone.js"></script>
+  <script src="js/systems/playerHome.js"></script>
+  <script src="js/systems/ubsInterior.js"></script>
+  <script src="js/systems/communitySpaces.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

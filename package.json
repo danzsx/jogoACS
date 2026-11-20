@@ -1,0 +1,10 @@
+{
+  "name": "acs-rpg",
+  "version": "1.0.0",
+  "description": "Território Vivo: Crônicas de um ACS - 2D Desktop RPG",
+  "main": "main.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tests/verify_game.js"
+  }
+}
