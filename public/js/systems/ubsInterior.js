@@ -1397,7 +1397,7 @@
 
         case 'acs_tiago':
           return {
-            greeting: `“E aí, parceiro(a) de microárea! Já sincronizei minhas fichas da Microárea 02 aqui no computador do e-SUS! Na sua área ainda tem ${pendingDengue} foco(s) de dengue para vistoriar e você está com ${g.dailyVisits}/${g.dailyGoal} visitas hoje.”`,
+            greeting: `“E aí, parceiro(a) de microárea! Já sincronizei minhas fichas da Microárea 02 aqui no computador do e-SUS! Na sua área ainda tem ${pendingDengue} foco(s) de dengue para vistoriar e você está com ${g.weeklyVisits}/${g.weeklyGoal} visitas na semana.”`,
             note: `Sala ESF • Microárea 02: O ACS Tiago acompanha vigilância ambiental (Aedes aegypti) e produtividade no e-SUS.`,
             choices: [
               {

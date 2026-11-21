@@ -4,7 +4,7 @@
 
 window.ACS_DATA = {
   TILE_SIZE: 32,
-  MAP_COLS: 80,
+  MAP_COLS: 120,
   MAP_ROWS: 56,
 
   // Casa do Protagonista (ACS mora na própria comunidade — leste da ponte, faceando Estrada do Sol)
@@ -55,6 +55,25 @@ window.ACS_DATA = {
     x: 69 * 32 + 16,
     y: 48 * 32 + 16,
     name: 'Terreno da Horta Comunitária'
+  },
+
+  // Bairro Vizinho (Vila Aurora — Leste da Microárea 04)
+  campinho: {
+    c1: 89,
+    r1: 29,
+    c2: 109,
+    r2: 38,
+    x: 99 * 32 + 16,
+    y: 33.5 * 32,
+    name: 'Campinho de Futebol da Vila Aurora'
+  },
+
+  mysteryHouse: {
+    tx: 106,
+    ty: 10,
+    x: 106 * 32 + 16,
+    y: 10 * 32 + 24,
+    name: 'Casa Misteriosa (Casarão Nº 00)'
   },
 
   days: [
@@ -1011,7 +1030,16 @@ window.ACS_DATA = {
     { x: 37 * 32, y: 45 * 32, style: 'ipe_gold', r: 56 },
     { x: 51 * 32, y: 45 * 32, style: 'ipe_pink', r: 56 },
     { x: 37 * 32, y: 50 * 32, style: 'ipe_pink', r: 56 },
-    { x: 51 * 32, y: 50 * 32, style: 'ipe_gold', r: 56 }
+    { x: 51 * 32, y: 50 * 32, style: 'ipe_gold', r: 56 },
+    // Bairro Vizinho (Vila Aurora)
+    { x: 88 * 32, y: 8 * 32, style: 'mango', r: 62 },
+    { x: 96 * 32, y: 8 * 32, style: 'ipe_gold', r: 56 },
+    { x: 102 * 32, y: 9 * 32, style: 'olive', r: 54 },
+    { x: 111 * 32, y: 9 * 32, style: 'ipe_pink', r: 58 },
+    { x: 92 * 32, y: 22 * 32, style: 'ipe_gold', r: 56 },
+    { x: 104 * 32, y: 22 * 32, style: 'mango', r: 60 },
+    { x: 88 * 32, y: 45 * 32, style: 'olive', r: 54 },
+    { x: 102 * 32, y: 46 * 32, style: 'ipe_pink', r: 58 }
   ],
 
   // Decorative neighborhood props (benches, bushes, barrels, flower pots, rocks)
@@ -1040,7 +1068,13 @@ window.ACS_DATA = {
     { type: 'rock', x: 19 * 32, y: 15 * 32 },
     { type: 'rock', x: 19 * 32, y: 29 * 32 },
     { type: 'rock', x: 22 * 32, y: 35 * 32 },
-    { type: 'rock', x: 78 * 32, y: 12 * 32 }
+    { type: 'rock', x: 78 * 32, y: 12 * 32 },
+    // Bairro Vizinho: arquibancadas/bancos no Campinho e entorno
+    { type: 'bench', x: 94 * 32, y: 28 * 32 + 12 },
+    { type: 'bench', x: 104 * 32, y: 28 * 32 + 12 },
+    { type: 'bush', x: 104 * 32, y: 10 * 32 + 12 },
+    { type: 'bush', x: 108 * 32, y: 10 * 32 + 12 },
+    { type: 'rock', x: 112 * 32, y: 34 * 32 }
   ]
 };
 

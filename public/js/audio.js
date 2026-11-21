@@ -609,6 +609,23 @@ class SoundFX {
     this.tone(587.33, 'sine', 0.28, 0.11, 0.24);
   }
 
+  // Gentle descending lullaby chime when lights dim for sleep
+  sleepDown() {
+    this.tone(392.0, 'sine', 0.24, 0.08, 0);
+    this.tone(329.63, 'sine', 0.26, 0.08, 0.16);
+    this.tone(293.66, 'sine', 0.30, 0.075, 0.34);
+    this.tone(246.94, 'sine', 0.42, 0.07, 0.54);
+  }
+
+  // Warm ascending morning chime when lights brighten upon waking
+  wakeUp() {
+    this.tone(293.66, 'sine', 0.20, 0.075, 0);
+    this.tone(369.99, 'triangle', 0.22, 0.075, 0.13);
+    this.tone(440.0, 'sine', 0.24, 0.085, 0.26);
+    this.tone(587.33, 'sine', 0.36, 0.095, 0.40);
+    setTimeout(() => this._playBirdChirp(), 420);
+  }
+
   // Cheerful Brazilian neighborhood bird chirp
   _playBirdChirp() {
     if (!this.enabled || !this.ctx || !this.ambienceGain) return;

@@ -21,6 +21,14 @@
       return this.game.storyState || null;
     }
 
+    _withInvestigation(entityId, graph) {
+      const inv = this.game.investigation;
+      if (inv && typeof inv.injectCaseOptions === 'function' && graph) {
+        return inv.injectCaseOptions(entityId, graph);
+      }
+      return graph;
+    }
+
     // ------------------------------------------------------------------------
     // 1. RESOLUÇÃO DE VISITA DOMICILIAR (FAMÍLIAS H01..H15)
     // ------------------------------------------------------------------------
@@ -31,7 +39,7 @@
 
       // Priority 1: Active Quest step (H2+)
       const questGraph = this.resolveActiveQuestGraph(fam.id, 'VISIT', fam);
-      if (questGraph) return questGraph;
+      if (questGraph) return this._withInvestigation(fam.id, questGraph);
 
       // Preserve Week 1 Pilot Graphs on the first home visit for each pilot family
       const pilotFlag = `pilot_${fam.id.toLowerCase()}_seen`;
@@ -40,20 +48,20 @@
         if (pilot) {
           g.narrative.flags[pilotFlag] = true;
           if (story) story.setFlag(pilotFlag, true);
-          return pilot;
+          return this._withInvestigation(fam.id, pilot);
         }
       }
 
       // Priority 2: Reactive follow-up to prior events/choices
       const reactive = this.resolveFamilyReactionGraph(fam);
-      if (reactive) return reactive;
+      if (reactive) return this._withInvestigation(fam.id, reactive);
 
       // Priority 3: Week 2+ or High-Bond Chapter progression variation
       const chapterBondGraph = this.resolveFamilyChapterBondGraph(fam);
-      if (chapterBondGraph) return chapterBondGraph;
+      if (chapterBondGraph) return this._withInvestigation(fam.id, chapterBondGraph);
 
       // Priority 5: Legacy DAILY_DIALOGUES via safeMod(dayOfWeek, 5)
-      return dlg.adaptLegacyDialogue(g.narrative.getDialogueForFamily(fam, g.dayOfWeek));
+      return this._withInvestigation(fam.id, dlg.adaptLegacyDialogue(g.narrative.getDialogueForFamily(fam, g.dayOfWeek)));
     }
 
     resolveFamilyReactionGraph(fam) {
@@ -254,7 +262,7 @@
       }
 
       const legacy = typeof fallbackLegacyFn === 'function' ? fallbackLegacyFn(fam, loc) : null;
-      return legacy ? g.dialogue.adaptLegacyDialogue(legacy) : null;
+      return this._withInvestigation(fam.id, legacy ? g.dialogue.adaptLegacyDialogue(legacy) : null);
     }
 
     // ------------------------------------------------------------------------
@@ -350,11 +358,11 @@
       // Priority 5: Pilot Graph -> Legacy UBS Staff content
       const pilot = dlg.getPilotGraph(staff.id);
       if (pilot && (!story || !story.hasFlag(`pilot_${staff.id}_done`))) {
-        return pilot;
+        return this._withInvestigation(staff.id, pilot);
       }
 
       const legacy = typeof fallbackLegacyFn === 'function' ? fallbackLegacyFn(staff) : null;
-      return legacy ? dlg.adaptLegacyDialogue(legacy) : null;
+      return this._withInvestigation(staff.id, legacy ? dlg.adaptLegacyDialogue(legacy) : null);
     }
 
     // ------------------------------------------------------------------------
@@ -421,10 +429,10 @@
 
       // First encounter pilot graphs (preserved for Phase 2 compatibility)
       const pilot = dlg.getPilotGraph(npc.id);
-      if (pilot) return pilot;
+      if (pilot) return this._withInvestigation(npc.id, pilot);
 
       const legacy = typeof fallbackLegacyFn === 'function' ? fallbackLegacyFn(npc) : null;
-      return legacy ? dlg.adaptLegacyDialogue(legacy) : null;
+      return this._withInvestigation(npc.id, legacy ? dlg.adaptLegacyDialogue(legacy) : null);
     }
 
     // Hook pronto para QuestSystem na Etapa H2

@@ -23,6 +23,9 @@ class ACSGame {
     this.timeMinutes = 7 * 60; // 07:00
     this.timeSpeed = 1.6; // game minutes per real second (~9 min real per full day)
     this.paused = true;
+    this.inMainMenu = true;
+    this._menuSelectedIndex = 0;
+    this._menuBound = false;
     this.elapsedTime = 0;
     this._lastHour = 7;
     this.currentLocation = 'PLAYER_HOME'; // 'OVERWORLD' | 'UBS_INTERIOR' | 'ESF_ROOM' | 'PLAYER_HOME'
@@ -33,6 +36,8 @@ class ACSGame {
     this.pracinha = window.ACS_DATA.pracinha;
     this.associacao = window.ACS_DATA.associacao;
     this.horta = window.ACS_DATA.horta;
+    this.campinho = window.ACS_DATA.campinho;
+    this.mysteryHouse = window.ACS_DATA.mysteryHouse;
 
     // UBS coordinates (aligned to 32x32 tiles: x=4..12, y=17..24)
     this.ubs = {
@@ -162,6 +167,9 @@ class ACSGame {
     // Longitudinal Narrative System (M2) & Story Memory (Etapa H1)
     this.narrative = new window.NarrativeSystem(this);
     this.storyState = new window.StoryStateSystem(this);
+    this.relationships = window.RelationshipSystem ? new window.RelationshipSystem(this) : null;
+    this.investigation = window.InvestigationSystem ? new window.InvestigationSystem(this) : null;
+    this.notebook = window.NotebookSystem ? new window.NotebookSystem(this) : null;
 
     // Multi-Turn Dialogue System (Phase 1 / H1 v2) & Resolver
     this.dialogue = new window.DialogueSystem(this);
@@ -173,6 +181,7 @@ class ACSGame {
 
     // Unified Scene Manager + Interiors (UBS, Sala ESF, Casa do ACS, Vendinha & Associação)
     this.sceneManager = new window.SceneManager(this);
+    this.animations = window.AnimationSystem ? new window.AnimationSystem(this) : null;
     this.playerHomeSystem = new window.PlayerHomeSystem(this);
     this.ubsInterior = new window.UBSInteriorSystem(this);
     this.communitySpaces = new window.CommunitySpacesSystem(this);
@@ -292,6 +301,43 @@ class ACSGame {
     fill(65, 44, 74, 52, 'D');
     fill(66, 45, 73, 51, 'G');
     fill(64, 47, 66, 48, 'D'); // Gate path connecting Associação & Horta
+
+    // Bairro Vizinho (Vila Aurora — cols 78..119)
+    // Connecting avenues from East Connector (cols 75..76) into Av. dos Esportes (cols 84..85)
+    fill(77, 25, 84, 28, 'W');
+    fill(77, 26, 84, 27, 'S');
+    fill(77, 39, 84, 42, 'W');
+    fill(77, 40, 84, 41, 'S');
+
+    // Av. dos Esportes (North-South cols 84..85) & East Perimeter (cols 114..115)
+    fill(83, 11, 86, 42, 'W');
+    fill(84, 12, 85, 41, 'S');
+    fill(113, 11, 116, 42, 'W');
+    fill(114, 12, 115, 41, 'S');
+
+    // Rua da Aurora (North rows 12..13), Rua do Campinho (Central rows 26..27), Rua das Mangueiras (South rows 40..41)
+    fill(83, 11, 116, 14, 'W');
+    fill(84, 12, 115, 13, 'S');
+    fill(83, 25, 116, 28, 'W');
+    fill(84, 26, 115, 27, 'S');
+    fill(83, 39, 116, 42, 'W');
+    fill(84, 40, 115, 41, 'S');
+
+    // Clean street intersections in Bairro Vizinho
+    fill(84, 12, 85, 41, 'S');
+    fill(114, 12, 115, 41, 'S');
+    fill(84, 12, 115, 13, 'S');
+    fill(84, 26, 115, 27, 'S');
+    fill(84, 40, 115, 41, 'S');
+
+    // Campinho de Futebol (cols 89..109, rows 29..38 — lush grass pitch framed by dirt border)
+    fill(88, 29, 110, 38, 'D');
+    fill(89, 29, 109, 38, 'G');
+
+    // Front path to Casa Misteriosa (tx: 106, ty: 10)
+    if (this.mysteryHouse) {
+      fill(this.mysteryHouse.tx, this.mysteryHouse.ty, this.mysteryHouse.tx + 1, this.mysteryHouse.ty + 2, 'D');
+    }
 
     return grid;
   }
@@ -547,9 +593,34 @@ class ACSGame {
 
     // Rain puddles on dirt/streets
     if (isRain) {
-      [[14, 24], [21, 24], [26, 18], [35, 12], [46, 26], [56, 40], [66, 26]].forEach(([pc, pr]) => {
+      [[14, 24], [21, 24], [26, 18], [35, 12], [46, 26], [56, 40], [66, 26], [84, 26], [98, 33]].forEach(([pc, pr]) => {
         ctx.drawImage(pa.tiles.puddle, pc * T, pr * T);
       });
+    }
+
+    // Campinho de Futebol white chalk pitch lines (cols 89..109, rows 29..38)
+    if (this.campinho) {
+      const fx = this.campinho.c1 * T + 12;
+      const fy = this.campinho.r1 * T + 10;
+      const fw = (this.campinho.c2 - this.campinho.c1) * T - 24;
+      const fh = (this.campinho.r2 - this.campinho.r1) * T - 20;
+      ctx.strokeStyle = 'rgba(248, 250, 252, 0.85)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(fx, fy, fw, fh);
+      // Halfway line
+      ctx.beginPath();
+      ctx.moveTo(fx + fw / 2, fy);
+      ctx.lineTo(fx + fw / 2, fy + fh);
+      ctx.stroke();
+      // Center circle & spot
+      ctx.beginPath();
+      ctx.arc(fx + fw / 2, fy + fh / 2, 42, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(fx + fw / 2 - 3, fy + fh / 2 - 3, 6, 6);
+      // Left & Right penalty boxes
+      ctx.strokeRect(fx, fy + fh / 2 - 64, 68, 128);
+      ctx.strokeRect(fx + fw - 68, fy + fh / 2 - 64, 68, 128);
     }
 
     return c;
@@ -611,6 +682,10 @@ class ACSGame {
 
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
+      if (this.animations && this.animations.isBlocking()) {
+        if (k === 'n') this.toggleAudioMute();
+        return;
+      }
       this.input.setKey(k, true);
 
       // Allow Enter/Space to confirm primary button in Intro / Day Summary modal
@@ -634,6 +709,11 @@ class ACSGame {
       if (k === 'c') {
         e.preventDefault();
         if (this.phone) this.phone.toggle();
+        return;
+      }
+      if (k === 'j') {
+        e.preventDefault();
+        if (this.notebook) this.notebook.toggle();
         return;
       }
       if (k === 'm') {
@@ -696,7 +776,7 @@ class ACSGame {
 
     // Click-to-walk on the game canvas (optional mouse navigation!)
     this.canvas.addEventListener('pointerdown', (e) => {
-      if (this.paused || e.button !== 0) return;
+      if (this.paused || (this.animations && this.animations.isBlocking()) || e.button !== 0) return;
       const rect = this.canvas.getBoundingClientRect();
       const b = this.sceneManager.getBounds();
       const worldX = window.ACSEngine.clamp(e.clientX - rect.left + this.camera.x, b.minX, b.maxX);
@@ -714,6 +794,23 @@ class ACSGame {
         if (this.phone) this.phone.toggle(true);
       });
     }
+    const btnNotebook = document.getElementById('btn-notebook');
+    if (btnNotebook) {
+      btnNotebook.addEventListener('click', () => {
+        if (this.notebook) this.notebook.toggle(true);
+      });
+    }
+    const btnCloseNotebook = document.getElementById('btn-close-notebook');
+    if (btnCloseNotebook) {
+      btnCloseNotebook.addEventListener('click', () => this.closeOverlays());
+    }
+    document.querySelectorAll('.notebook-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!this.notebook) return;
+        this.notebook.activeTab = btn.dataset.notebookTab;
+        this.notebook.render();
+      });
+    });
     const btnClosePhone = document.getElementById('btn-close-phone');
     if (btnClosePhone) {
       btnClosePhone.addEventListener('click', () => this.closeOverlays());
@@ -802,6 +899,18 @@ class ACSGame {
           this.closeOverlays();
           return;
         }
+        if (this.campinho && wx >= this.campinho.c1 * 32 && wx <= this.campinho.c2 * 32 && wy >= this.campinho.r1 * 32 && wy <= this.campinho.r2 * 32) {
+          this.navigation.setPin({ type: 'CAMPINHO', id: 'CAMPINHO' });
+          this.toast('📍 Rota marcada: Campinho de Futebol!', 'info');
+          this.closeOverlays();
+          return;
+        }
+        if (this.mysteryHouse && Math.hypot(wx - this.mysteryHouse.x, wy - (this.mysteryHouse.y - 40)) < 110) {
+          this.navigation.setPin({ type: 'MYSTERY_HOUSE', id: 'MYSTERY_HOUSE' });
+          this.toast('📍 Rota marcada: Casa Misteriosa!', 'info');
+          this.closeOverlays();
+          return;
+        }
 
         let closest = null;
         let minDist = 110;
@@ -840,6 +949,9 @@ class ACSGame {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
     this.ctx.imageSmoothingEnabled = false;
+    if (this.animations) {
+      this.animations.resize(this.canvas.width, this.canvas.height);
+    }
   }
 
   initAudioControls() {
@@ -1202,7 +1314,13 @@ class ACSGame {
       this.musicDirector.update(safeDt);
     }
 
-    if (!this.paused) {
+    if (this.animations) {
+      this.animations.update(safeDt);
+    }
+
+    if (this.inMainMenu) {
+      this.updateMainMenuCamera(safeDt);
+    } else if (!this.paused && !(this.animations && this.animations.isBlocking())) {
       this.update(safeDt);
     }
     this.draw();
@@ -1451,8 +1569,8 @@ class ACSGame {
       }
     }
 
-    // Protagonist's Home, Vendinha & Associação lower base footprints
-    for (const bldg of [this.playerHome, this.vendinha, this.associacao]) {
+    // Protagonist's Home, Vendinha, Associação & Casa Misteriosa lower base footprints
+    for (const bldg of [this.playerHome, this.vendinha, this.associacao, this.mysteryHouse]) {
       if (!bldg) continue;
       if (px > bldg.x - 62 && px < bldg.x + 62 && py > bldg.y - 76 && py < bldg.y - 24) {
         return true;
@@ -1858,6 +1976,28 @@ class ACSGame {
       return;
     }
 
+    // Campinho de Futebol (Bairro Vizinho)
+    if (this.campinho && Math.hypot(this.player.x - this.campinho.x, this.player.y - this.campinho.y) < 64) {
+      this.nearTarget = {
+        type: 'CAMPINHO',
+        x: this.campinho.x,
+        y: this.campinho.y - 34,
+        label: '[E] Bater Bola / Olhar o Campinho'
+      };
+      return;
+    }
+
+    // Casa Misteriosa (Bairro Vizinho)
+    if (this.mysteryHouse && Math.hypot(this.player.x - this.mysteryHouse.x, this.player.y - this.mysteryHouse.y) < 64) {
+      this.nearTarget = {
+        type: 'MYSTERY_HOUSE',
+        x: this.mysteryHouse.x,
+        y: this.mysteryHouse.y - 44,
+        label: '[E] Investigar Portão da Casa Misteriosa'
+      };
+      return;
+    }
+
     for (const spot of this.dengueSpots) {
       if (!spot.cleared && Math.hypot(this.player.x - spot.x, this.player.y - spot.y) < 52) {
         this.nearTarget = { type: 'DENGUE', spot, x: spot.x, y: spot.y - 32, label: '[E] Eliminar Foco' };
@@ -1944,6 +2084,10 @@ class ACSGame {
         '🌻 Horta Comunitária (Estágio 3): Canteiros vivos, irrigados e produtivos na Vila Esperança!'
       ];
       this.toast(stageMsgs[stage] || stageMsgs[0], 'info');
+    } else if (this.nearTarget.type === 'CAMPINHO') {
+      this.interactWithCampinho();
+    } else if (this.nearTarget.type === 'MYSTERY_HOUSE') {
+      this.openMysteryHouseDialogue();
     } else if (this.nearTarget.type === 'BENCH') {
       this.restOnBench();
     } else if (this.nearTarget.type === 'DENGUE') {
@@ -1953,6 +2097,101 @@ class ACSGame {
     } else if (this.nearTarget.type === 'HOUSE') {
       this.visitHouse(this.nearTarget.family);
     }
+  }
+
+  interactWithCampinho() {
+    this.timeMinutes += 10;
+    this.player.stamina = Math.min(100, this.player.stamina + 8);
+    this.setPlayerEmote('heart', 2.2);
+    if (window.sfx && typeof window.sfx.success === 'function') window.sfx.success();
+    this.toast('⚽ Você deu uns toques na bola no Campinho da Vila Aurora! (+8 Energia, +10 min)', 'success');
+    if (this.notebook) {
+      this.notebook.addChronicleEntry(
+        '⚽ Campinho da Vila Aurora',
+        'O campinho do bairro vizinho reúne jovens no fim da tarde — e comentam sobre o casarão fechado no canto nordeste.'
+      );
+    }
+    this.updateHUD();
+    this.saveProgress();
+  }
+
+  openMysteryHouseDialogue() {
+    const g = this;
+    const mh = this.mysteryHouse;
+    if (!mh || !this.dialogue) return;
+    const alreadyChecked = this.storyState && this.storyState.hasFlag('mystery_house_inspected');
+
+    const graph = {
+      startNode: 'portao',
+      nodes: {
+        portao: {
+          speaker: 'player',
+          text: alreadyChecked
+            ? 'O portão de ferro do Casarão Nº 00 segue trancado com corrente. A tigela de água fresca para os gatos continua ali no canto do muro — alguém cuida dela à noite.'
+            : 'Um casarão silencioso de janelas fechadas no canto da Vila Aurora. A caixa de correio está cheia de cartas antigas, mas há uma tigela limpa com água fresca perto da fresta do portão.',
+          note: 'Bairro Vizinho (Vila Aurora) • Casa Misteriosa (Nº 00).',
+          choices: [
+            {
+              text: 'Examinar os envelopes na caixa de correio e as pegadas na calçada.',
+              intent: '🔍 Investigar vestígios',
+              next: 'descoberta',
+              effects: {
+                setFlags: { mystery_house_inspected: true }
+              }
+            },
+            {
+              text: 'Deixar o portão em paz e seguir explorando o bairro.',
+              intent: '🚶 Seguir caminho',
+              reply: 'Você anotou a localização do casarão para observar em outro momento.'
+            }
+          ]
+        },
+        descoberta: {
+          speaker: 'player',
+          text: 'Os envelopes trazem o nome "Sr. Arnaldo V. — Antiga Ferrovia", com avisos antigos sem retorno. Ninguém aparece no cadastro da UBS, mas há sinais claros de que alguém ainda entra aqui tarde da noite.',
+          note: 'Pista anotada no Caderno de Campo [J] — mistério realista do território.',
+          choices: [
+            {
+              text: 'Registrar a descoberta no Caderno de Campo.',
+              intent: '📓 Anotar no Caderno',
+              effects: {
+                postureDelta: { acolhimento: 1 }
+              },
+              reply: 'Anotado! Um antigo ferroviário sem cadastro no SUS pode estar vivendo isolado aqui.'
+            }
+          ]
+        }
+      }
+    };
+
+    const profile = this.dialogue.resolveSpeakerProfile('player');
+    this.dialogue.startGraph({
+      entityType: 'STAFF',
+      entityData: profile ? profile.entityData : {},
+      entityId: 'player',
+      tag: 'Vila Aurora • Bairro Vizinho',
+      name: mh.name,
+      badgesHtml: '<span class="badge trabalhador">❓ Casarão Fechado</span>',
+      bondPct: 30,
+      bondText: 'Desconhecido',
+      graph,
+      onFinish: (choice) => {
+        if (g.notebook && g.storyState && g.storyState.hasFlag('mystery_house_inspected')) {
+          g.notebook.addChronicleEntry(
+            '❓ Casa Misteriosa (Casarão Nº 00)',
+            'Caixa de correio em nome de Sr. Arnaldo V. (ex-ferroviário), tigela de água limpa e sinais de presença noturna fora do cadastro da UBS.'
+          );
+        }
+        g.setDialogueText(choice.reply);
+        const choicesEl = document.getElementById('dlg-choices');
+        choicesEl.innerHTML = '';
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn';
+        btn.innerHTML = '<span>Voltar para a rua.</span><span class="choice-tag">Prosseguir</span>';
+        btn.addEventListener('click', () => g.closeOverlays());
+        choicesEl.appendChild(btn);
+      }
+    });
   }
 
   clearDengueSpot(spot) {
@@ -2209,19 +2448,19 @@ class ACSGame {
       'Unidade Básica de Saúde • Equipe Saúde da Família',
       'Enfª Marina (UBS)',
       `<span class="badge amigo">💧 Bebedouro</span><span class="badge prioritario">📊 e-SUS</span>`,
-      Math.min(100, Math.round((this.dailyVisits / this.dailyGoal) * 100)),
-      `Meta: ${this.dailyVisits}/${this.dailyGoal}`
+      Math.min(100, Math.round((this.weeklyVisits / this.weeklyGoal) * 100)),
+      `Semana: ${this.weeklyVisits}/${this.weeklyGoal}`
     );
 
     const dayData = this.getCurrentDayData();
     const bonus = this.narrative.evaluateBonusGoal(this.dayIndex);
     this.setDialogueText(
-      `“Olá, Agente! Dia ${dayData.day} (${dayData.name}): ${dayData.title}. Aqui na UBS você pode reabastecer sua garrafa d'água, pegar insumos ou fechar a produção diária no e-SUS.”`
+      `“Olá, Agente! Semana ${this.weekNumber} (${dayData.name}): ${dayData.title}. Aqui na UBS você pode reabastecer sua garrafa d'água, pegar insumos ou sincronizar a produção semanal no e-SUS.”`
     );
 
     const noteEl = document.getElementById('dlg-clinical-note');
     noteEl.classList.remove('hidden');
-    noteEl.innerHTML = `Hoje: <strong>${this.dailyVisits}/${this.dailyGoal}</strong> visitas (${this.formatClock(this.timeMinutes)}) • Objetivo Bônus: ${bonus.met ? '✅' : '🎯'} ${bonus.progress}`;
+    noteEl.innerHTML = `Semana ${this.weekNumber}: <strong>${this.weeklyVisits}/${this.weeklyGoal}</strong> visitas (${this.formatClock(this.timeMinutes)}) • Objetivo Bônus: ${bonus.met ? '✅' : '🎯'} ${bonus.progress}`;
 
     const choicesEl = document.getElementById('dlg-choices');
     [
@@ -2389,7 +2628,27 @@ class ACSGame {
 
   resolveVisitChoice(fam, choice) {
     this.timeMinutes += 20;
-    fam.bond = Math.max(5, Math.min(100, fam.bond + (choice.bondDelta || 0)));
+    const ok = choice.type !== 'AUTHORITARIAN';
+    let bondDelta = choice.bondDelta || 0;
+    let relFeedback = '';
+
+    if (this.relationships) {
+      const preRec = this.relationships.getContextualReceptivity(fam.id);
+      const relRes = this.relationships.recordInteraction(fam.id, choice, ok);
+      if (ok && (fam.stubbornness || 0) >= 60 && preRec < 35 && !relRes.matchedPreferred && bondDelta > 0) {
+        bondDelta = Math.max(4, Math.round(bondDelta * 0.6));
+        relFeedback = ' • Resistência alta limitou o avanço (tente ajustar a abordagem no Caderno [J])';
+      } else if (relRes.matchedPreferred && ok) {
+        bondDelta += relRes.bondBonus;
+        fam.stubbornness = Math.max(0, (fam.stubbornness || 0) - 5);
+        relFeedback = ` • Estilo certeiro (${this.relationships.getStyleMeta(relRes.style).short})!`;
+      } else if (relRes.matchedAverse && ok) {
+        bondDelta = Math.max(2, bondDelta + relRes.bondBonus);
+        relFeedback = ' • Morador preferiria outra abordagem';
+      }
+    }
+
+    fam.bond = Math.max(5, Math.min(100, fam.bond + bondDelta));
     if (choice.stubbornDelta) fam.stubbornness = Math.max(0, fam.stubbornness + choice.stubbornDelta);
     if (choice.staminaDelta) this.player.stamina = Math.min(100, this.player.stamina + choice.staminaDelta);
     if (choice.hydrationDelta) {
@@ -2411,7 +2670,6 @@ class ACSGame {
       });
     }
 
-    const ok = choice.type !== 'AUTHORITARIAN';
     this.narrative.recordVisit(fam, choice, ok);
     if (ok && choice.flag && this.storyState) {
       this.storyState.setFlag(choice.flag, true);
@@ -2449,7 +2707,7 @@ class ACSGame {
     const noteEl = document.getElementById('dlg-clinical-note');
     if (ok) {
       const extra = revealed.length > 0 ? ` • Horários descobertos no Tablet: ${revealed.join(', ')}!` : '';
-      noteEl.innerHTML = `✅ <strong>Visita registrada no e-SUS!</strong> (Semana: ${this.weeklyVisits}/${this.weeklyGoal} • Vínculo: ${fam.bond}%)${extra}`;
+      noteEl.innerHTML = `✅ <strong>Visita registrada no e-SUS!</strong> (Semana: ${this.weeklyVisits}/${this.weeklyGoal} • Vínculo: ${fam.bond}%)${extra}${relFeedback}`;
     } else {
       noteEl.innerHTML = '⚠️ <strong>Resistência aumentou!</strong> O morador encerrou a conversa. Volte outro dia com escuta acolhedora!';
     }
@@ -2912,6 +3170,26 @@ class ACSGame {
       ctx.font = 'bold 9px Consolas';
       ctx.fillText('HORTA', (this.horta.x - 36) * sx, this.horta.y * sy);
     }
+    if (this.campinho) {
+      ctx.fillStyle = 'rgba(22, 163, 74, 0.45)';
+      ctx.fillRect(this.campinho.c1 * 32 * sx, this.campinho.r1 * 32 * sy, (this.campinho.c2 - this.campinho.c1) * 32 * sx, (this.campinho.r2 - this.campinho.r1) * 32 * sy);
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(this.campinho.c1 * 32 * sx, this.campinho.r1 * 32 * sy, (this.campinho.c2 - this.campinho.c1) * 32 * sx, (this.campinho.r2 - this.campinho.r1) * 32 * sy);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 9px Consolas';
+      ctx.fillText('CAMPINHO', (this.campinho.x - 65) * sx, this.campinho.y * sy);
+    }
+    if (this.mysteryHouse) {
+      ctx.fillStyle = '#334155';
+      ctx.fillRect((this.mysteryHouse.x - 52) * sx, (this.mysteryHouse.y - 95) * sy, 104 * sx, 76 * sy);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 2;
+      ctx.strokeRect((this.mysteryHouse.x - 52) * sx, (this.mysteryHouse.y - 95) * sy, 104 * sx, 76 * sy);
+      ctx.fillStyle = '#fef08a';
+      ctx.font = 'bold 9px Consolas';
+      ctx.fillText('???', (this.mysteryHouse.x - 20) * sx, (this.mysteryHouse.y - 45) * sy);
+    }
 
     // Dogs zones
     this.dogs.forEach(d => {
@@ -2968,9 +3246,35 @@ class ACSGame {
     ctx.stroke();
   }
 
+  updateMainMenuCamera(dt) {
+    // Gentle scenic camera pan over Vila Esperança (UBS, stream bridge, Vendinha & houses)
+    const maxCamX = Math.max(0, this.worldWidth - this.canvas.width);
+    const maxCamY = Math.max(0, this.worldHeight - this.canvas.height);
+    const centerX = window.ACSEngine.clamp(16 * this.TILE - this.canvas.width * 0.35, 0, maxCamX);
+    const centerY = window.ACSEngine.clamp(21 * this.TILE - this.canvas.height * 0.45, 0, maxCamY);
+    const panX = Math.sin(this.elapsedTime * 0.11) * Math.min(180, maxCamX * 0.25);
+    const panY = Math.cos(this.elapsedTime * 0.08) * Math.min(85, maxCamY * 0.2);
+
+    this.camera.x = window.ACSEngine.clamp(centerX + panX, 0, maxCamX);
+    this.camera.y = window.ACSEngine.clamp(centerY + panY, 0, maxCamY);
+
+    // Keep ambient leaves & cats gently alive on the title screen
+    if (this.leafParticles) {
+      for (const leaf of this.leafParticles) {
+        leaf.x += leaf.vx * dt;
+        leaf.y += leaf.vy * dt;
+        if (leaf.x > this.worldWidth + 20 || leaf.y > this.worldHeight + 20) {
+          Object.assign(leaf, this.spawnLeaf(false));
+        }
+      }
+    }
+  }
+
   closeOverlays() {
     document.getElementById('dialogue-overlay').classList.add('hidden');
     document.getElementById('tablet-overlay').classList.add('hidden');
+    const notebookOverlay = document.getElementById('notebook-overlay');
+    if (notebookOverlay) notebookOverlay.classList.add('hidden');
     const phoneOverlay = document.getElementById('phone-overlay');
     if (phoneOverlay) phoneOverlay.classList.add('hidden');
     document.getElementById('map-overlay').classList.add('hidden');
@@ -3032,6 +3336,9 @@ class ACSGame {
       dengueSpots: this.dengueSpots.map(s => ({ id: s.id, cleared: s.cleared })),
       narrative: this.narrative ? this.narrative.exportState() : null,
       storyState: this.storyState ? this.storyState.exportState() : null,
+      relationships: this.relationships ? this.relationships.exportState() : null,
+      investigation: this.investigation ? this.investigation.exportState() : null,
+      notebook: this.notebook ? this.notebook.exportState() : null,
       ubsInterior: this.ubsInterior ? this.ubsInterior.exportState() : null,
       playerHome: this.playerHomeSystem ? this.playerHomeSystem.exportState() : null,
       phone: this.phone ? this.phone.exportState() : null,
@@ -3112,6 +3419,15 @@ class ACSGame {
     if (this.storyState) {
       this.storyState.importState(saved.storyState || null);
     }
+    if (this.relationships) {
+      this.relationships.importState(saved.relationships || null);
+    }
+    if (this.investigation) {
+      this.investigation.importState(saved.investigation || null);
+    }
+    if (this.notebook) {
+      this.notebook.importState(saved.notebook || null);
+    }
     if (this.quests) {
       this.quests.ensureInitialQuest();
     }
@@ -3141,82 +3457,328 @@ class ACSGame {
   }
 
   showIntroModal() {
+    this.inMainMenu = true;
     this.paused = true;
     this.input.clear();
-    const overlay = document.getElementById('summary-overlay');
-    const card = document.getElementById('summary-card');
-    overlay.classList.remove('hidden');
+    document.body.classList.add('main-menu-active');
+
+    const menuOverlay = document.getElementById('main-menu-overlay');
+    const summaryOverlay = document.getElementById('summary-overlay');
+    if (summaryOverlay) summaryOverlay.classList.add('hidden');
+    if (!menuOverlay) return;
+    menuOverlay.classList.remove('hidden');
 
     const saved = this.saveManager ? this.saveManager.load() : null;
     const savedDay = saved ? (window.ACS_DATA.days[saved.dayOfWeek ?? saved.dayIndex ?? 0] || window.ACS_DATA.days[0]) : null;
     const savedWeek = saved ? (saved.weekNumber || 1) : 1;
     const savedVisits = saved ? (saved.weeklyVisits ?? saved.dailyVisits ?? 0) : 0;
-    const actionButtons = saved
-      ? `
-        <div class="intro-btn-row">
-          <button class="primary-btn" id="btn-continue-game">▶️ Continuar Jornada Salva (Sem. ${savedWeek} • ${savedDay.shortName} • ${this.formatClock(saved.timeMinutes)} • ${savedVisits}/15 visitas)</button>
-          <button class="secondary-btn" id="btn-start-game">🌻 Começar Nova Jornada (Semana 1)</button>
-        </div>
-      `
-      : `<button class="primary-btn" id="btn-start-game">🌻 Acordar em Casa — Semana 1 na Vila Esperança</button>`;
 
-    card.innerHTML = `
-      <h1>🩺 Território Vivo: Crônicas de um ACS</h1>
-      <h2>RPG 2D Narrativo — Microárea 04 • Vila Esperança</h2>
-      <p style="font-size:14px;line-height:1.55">
-        Você mora na <strong>Vila Esperança</strong> e veste o colete azul do <strong>Agente Comunitário de Saúde</strong>! Acorde em casa às <strong>07:00</strong>, organize sua semana entre a <strong>UBS</strong> (Seg–Sex, 08h–18h), as visitas às famílias e a <strong>noite livre na comunidade</strong> (até 22:00).
-      </p>
-      <div class="feature-grid">
-        <div class="feature-item">
-          <strong>🏡 Sua Casa & Ritmo Semanal (6 Dias)</strong>
-          Sem correria punitiva! A meta agora é <strong>semanal (15 visitas + 4 prioridades)</strong>. Descanse em bancos, visite trabalhadores à noite e durma em casa após 17h para avançar o dia e a semana!
-        </div>
-        <div class="feature-item">
-          <strong>🏥 UBS Visitável & Sala ESF (ACS)</strong>
-          Entre na <strong>UBS Vila Esperança</strong> (08h–18h) para conversar com médico, enfermeiros, fisioterapeuta, escriturário, vigia e limpeza, e visite a <strong>Sala ESF</strong> com seus colegas ACS!
-        </div>
-        <div class="feature-item">
-          <strong>💬 Diálogos Humanos Multi-Turno</strong>
-          Leia as pessoas sem spoilers óbvios: escuta ativa, humor e paciência abrem portas que sermões fecham.
-        </div>
-        <div class="feature-item">
-          <strong>⌨️ Controles Desktop & Mouse</strong>
-          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / Setas (ou clique no chão): Andar • <kbd>SHIFT</kbd>: Correr<br>
-          <kbd>E</kbd> / <kbd>ESPAÇO</kbd>: Interagir • <kbd>1–4</kbd>: Itens/Diálogo • <kbd>TAB</kbd>: Tablet • <kbd>M</kbd>: Mapa
-        </div>
-      </div>
-      ${actionButtons}
-    `;
-
-    const btnContinue = document.getElementById('btn-continue-game');
-    if (btnContinue) {
-      btnContinue.addEventListener('click', () => {
-        window.sfx.init();
-        window.sfx.success();
-        this.loadProgress();
-        this.toast('💾 Progresso restaurado! Boa caminhada na Microárea 04!', 'success');
-        this.closeOverlays();
-        if (this.musicDirector) this.musicDirector.markStarted();
-      });
+    const btnContinue = menuOverlay.querySelector('[data-action="continue"]');
+    const saveMeta = document.getElementById('menu-save-meta');
+    if (btnContinue && saveMeta) {
+      if (saved) {
+        btnContinue.classList.remove('is-disabled');
+        btnContinue.disabled = false;
+        saveMeta.textContent = `Sem.${savedWeek} • ${savedDay.shortName} • ${savedVisits}/15`;
+        saveMeta.classList.remove('hidden');
+      } else {
+        btnContinue.classList.add('is-disabled');
+        btnContinue.disabled = true;
+        saveMeta.classList.add('hidden');
+      }
     }
 
-    document.getElementById('btn-start-game').addEventListener('click', () => {
-      window.sfx.init();
-      window.sfx.success();
+    const buttons = Array.from(menuOverlay.querySelectorAll('.menu-item-btn'));
+    const selectIndex = (idx) => {
+      const safeIdx = ((idx % buttons.length) + buttons.length) % buttons.length;
+      this._menuSelectedIndex = safeIdx;
+      buttons.forEach((b, i) => b.classList.toggle('is-selected', i === safeIdx));
+    };
+
+    // Default highlight on Continuar if save exists, else Novo Jogo
+    selectIndex(saved ? 1 : 0);
+
+    const exitMainMenu = () => {
+      this.inMainMenu = false;
+      document.body.classList.remove('main-menu-active');
+      menuOverlay.classList.add('hidden');
+      const submodal = document.getElementById('menu-submodal');
+      if (submodal) submodal.classList.add('hidden');
+      this.sceneManager.snapCamera();
+      this.closeOverlays();
+    };
+
+    const startFreshGame = () => {
+      if (window.sfx) {
+        window.sfx.init();
+        window.sfx.success();
+      }
       if (this.saveManager) this.saveManager.clear();
       if (this.storyState) this.storyState.reset();
+      if (this.relationships) this.relationships.reset();
+      if (this.investigation) this.investigation.reset();
+      if (this.notebook) this.notebook.reset();
       if (this.quests) this.quests.ensureInitialQuest();
-      this.closeOverlays();
+      exitMainMenu();
       this.updateStoryHudPill();
-      if (this.storyEvents) {
+      if (this.animations) {
+        this.animations.playWakeUp({
+          onComplete: () => {
+            if (this.storyEvents) this.storyEvents.triggerPrologueIntro();
+          }
+        });
+      } else if (this.storyEvents) {
         this.storyEvents.triggerPrologueIntro();
       }
       if (this.musicDirector) this.musicDirector.markStarted();
-    });
+    };
+
+    const continueSavedGame = () => {
+      if (!saved) return;
+      if (window.sfx) {
+        window.sfx.init();
+        window.sfx.success();
+      }
+      this.loadProgress();
+      exitMainMenu();
+      if (this.animations) {
+        this.animations.playWakeUp({
+          onComplete: () => {
+            this.toast('💾 Progresso restaurado! Boa caminhada na Microárea 04!', 'success');
+          }
+        });
+      } else {
+        this.toast('💾 Progresso restaurado! Boa caminhada na Microárea 04!', 'success');
+      }
+      if (this.musicDirector) this.musicDirector.markStarted();
+    };
+
+    const openSubmodal = (html) => {
+      const sub = document.getElementById('menu-submodal');
+      const card = document.getElementById('menu-submodal-card');
+      if (!sub || !card) return;
+      card.innerHTML = html;
+      sub.classList.remove('hidden');
+    };
+
+    const closeSubmodal = () => {
+      const sub = document.getElementById('menu-submodal');
+      if (sub) sub.classList.add('hidden');
+    };
+
+    const openSettingsModal = () => {
+      const sfx = window.sfx || { volume: 0.7, musicVolume: 0.55, sfxVolume: 0.8, ambienceVolume: 0.6, enabled: true };
+      openSubmodal(`
+        <h2>⚙️ Configurações</h2>
+        <div class="menu-settings-row">
+          <span>🔊 Áudio Geral</span>
+          <button id="menu-btn-mute" class="wood-close-btn" style="padding:5px 12px">${sfx.enabled ? 'Ativado' : 'Mutado'}</button>
+        </div>
+        <div class="menu-settings-row">
+          <span>🎚️ Volume Geral</span>
+          <input id="menu-vol-master" type="range" min="0" max="100" value="${Math.round(sfx.volume * 100)}">
+        </div>
+        <div class="menu-settings-row">
+          <span>🎵 Música</span>
+          <input id="menu-vol-music" type="range" min="0" max="100" value="${Math.round(sfx.musicVolume * 100)}">
+        </div>
+        <div class="menu-settings-row">
+          <span>🔔 Efeitos</span>
+          <input id="menu-vol-sfx" type="range" min="0" max="100" value="${Math.round(sfx.sfxVolume * 100)}">
+        </div>
+        <div class="menu-settings-row">
+          <span>🌿 Ambiente</span>
+          <input id="menu-vol-amb" type="range" min="0" max="100" value="${Math.round(sfx.ambienceVolume * 100)}">
+        </div>
+        <div class="feature-item" style="margin-top:10px">
+          <strong>⌨️ Controles do Jogo</strong>
+          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / Setas ou clique: Andar • <kbd>SHIFT</kbd>: Correr<br>
+          <kbd>E</kbd> / <kbd>ESPAÇO</kbd>: Interagir • <kbd>TAB</kbd>: Tablet e-SUS • <kbd>C</kbd>: Celular • <kbd>M</kbd>: Mapa • <kbd>N</kbd>: Mutar
+        </div>
+        <button class="primary-btn" id="menu-sub-close">Voltar ao Menu</button>
+      `);
+
+      const syncSlider = (id, hudId, fn) => {
+        const el = document.getElementById(id);
+        const hudEl = document.getElementById(hudId);
+        if (!el) return;
+        el.addEventListener('input', () => {
+          if (window.sfx) {
+            window.sfx.init();
+            window.sfx[fn](el.value / 100);
+          }
+          if (hudEl) hudEl.value = el.value;
+        });
+      };
+
+      syncSlider('menu-vol-master', 'audio-volume', 'setVolume');
+      syncSlider('menu-vol-music', 'music-volume', 'setMusicVolume');
+      syncSlider('menu-vol-sfx', 'sfx-volume', 'setSfxVolume');
+      syncSlider('menu-vol-amb', 'ambience-volume', 'setAmbienceVolume');
+
+      const muteBtn = document.getElementById('menu-btn-mute');
+      if (muteBtn) {
+        muteBtn.addEventListener('click', () => {
+          this.toggleAudioMute();
+          muteBtn.textContent = window.sfx && window.sfx.enabled ? 'Ativado' : 'Mutado';
+        });
+      }
+      document.getElementById('menu-sub-close').addEventListener('click', closeSubmodal);
+    };
+
+    const openCreditsModal = () => {
+      openSubmodal(`
+        <h2>📜 Créditos & Sobre o Jogo</h2>
+        <div class="feature-item" style="margin-bottom:10px">
+          <strong>🩺 Território Vivo: Crônicas de um ACS</strong>
+          Um RPG 2D narrativo sobre o cotidiano, os vínculos e a humanidade do trabalho dos <strong>Agentes Comunitários de Saúde (ACS)</strong> no SUS e na Estratégia Saúde da Família (ESF).
+        </div>
+        <div class="feature-item" style="margin-bottom:10px">
+          <strong>🏡 Vila Esperança — Microárea 04</strong>
+          15 famílias com rotinas próprias, UBS visitável, Sala ESF, eventos comunitários, vigilância ambiental e histórias interligadas ao longo das semanas.
+        </div>
+        <div style="font-size:12.5px;color:var(--ink-mid);text-align:center;margin-top:6px">
+          Versão 1.0.1 Beta • Pixel Art & Áudio Procedural WebAudio
+        </div>
+        <button class="primary-btn" id="menu-sub-close">Voltar ao Menu</button>
+      `);
+      document.getElementById('menu-sub-close').addEventListener('click', closeSubmodal);
+    };
+
+    const handleAction = (action) => {
+      if (window.sfx) {
+        window.sfx.init();
+        if (typeof window.sfx.click === 'function') window.sfx.click();
+      }
+      if (action === 'continue') {
+        continueSavedGame();
+        return;
+      }
+      if (action === 'new') {
+        if (saved) {
+          openSubmodal(`
+            <h2>🌻 Começar Nova Jornada?</h2>
+            <p style="font-size:14px;line-height:1.5;margin-bottom:8px">
+              Você já possui uma jornada salva (<strong>Semana ${savedWeek} • ${savedDay.shortName} • ${savedVisits}/15 visitas</strong>). Iniciar um novo jogo substituirá o progresso salvo.
+            </p>
+            <div class="menu-submodal-actions">
+              <button class="primary-btn" id="confirm-new-game">Sim, Começar do Zero</button>
+              <button class="secondary-btn" id="cancel-new-game">Cancelar</button>
+            </div>
+          `);
+          document.getElementById('confirm-new-game').addEventListener('click', startFreshGame);
+          document.getElementById('cancel-new-game').addEventListener('click', closeSubmodal);
+        } else {
+          startFreshGame();
+        }
+        return;
+      }
+      if (action === 'settings') {
+        openSettingsModal();
+        return;
+      }
+      if (action === 'credits') {
+        openCreditsModal();
+        return;
+      }
+      if (action === 'exit') {
+        try { window.close(); } catch (_) {}
+        openSubmodal(`
+          <h2>👋 Até logo, ACS!</h2>
+          <p style="font-size:14px;line-height:1.5;margin-bottom:8px">
+            O navegador protege abas abertas contra fechamento automático. Você pode fechar esta aba com segurança ou voltar para a Vila Esperança!
+          </p>
+          <button class="primary-btn" id="menu-sub-close">Voltar ao Menu</button>
+        `);
+        document.getElementById('menu-sub-close').addEventListener('click', closeSubmodal);
+      }
+    };
+
+    if (!this._menuBound) {
+      this._menuBound = true;
+      buttons.forEach((btn, idx) => {
+        btn.addEventListener('mouseenter', () => {
+          if (!btn.disabled) selectIndex(idx);
+        });
+        btn.addEventListener('click', () => {
+          if (btn.disabled) return;
+          handleAction(btn.dataset.action);
+        });
+      });
+
+      const submodal = document.getElementById('menu-submodal');
+      if (submodal) {
+        submodal.addEventListener('click', (e) => {
+          if (e.target === submodal) closeSubmodal();
+        });
+      }
+
+      window.addEventListener('keydown', (e) => {
+        if (!this.inMainMenu) return;
+        const subOpen = submodal && !submodal.classList.contains('hidden');
+        const k = e.key.toLowerCase();
+        if (subOpen) {
+          if (k === 'escape') {
+            e.preventDefault();
+            closeSubmodal();
+          }
+          return;
+        }
+        if (k === 'arrowdown' || k === 's') {
+          e.preventDefault();
+          let next = this._menuSelectedIndex + 1;
+          if (buttons[next % buttons.length]?.disabled) next++;
+          selectIndex(next);
+        } else if (k === 'arrowup' || k === 'w') {
+          e.preventDefault();
+          let prev = this._menuSelectedIndex - 1;
+          if (buttons[((prev % buttons.length) + buttons.length) % buttons.length]?.disabled) prev--;
+          selectIndex(prev);
+        } else if (k === 'enter' || k === ' ') {
+          e.preventDefault();
+          const activeBtn = buttons[this._menuSelectedIndex];
+          if (activeBtn && !activeBtn.disabled) {
+            handleAction(activeBtn.dataset.action);
+          }
+        }
+      });
+    }
   }
 
   // Sleep / Advance Day (Phase 1: Continuous 6-Day Week + Sunday Turnaround)
   sleepToNextDay(reason = 'SLEEP') {
+    if (this.animations && this.animations.isPlaying('sleep')) return;
+
+    const isSaturday = this.dayOfWeek >= 5;
+    const isLateNight = reason === 'LATE_NIGHT';
+
+    if (this.animations) {
+      this.animations.playSleep({
+        mode: isLateNight ? 'LATE_NIGHT' : 'NIGHT',
+        stopAtDark: isSaturday,
+        onMidpoint: () => {
+          this.events.emit('day:ended', {
+            weekNumber: this.weekNumber,
+            dayOfWeek: this.dayOfWeek,
+            reason
+          });
+          if (!isSaturday) {
+            this.dayOfWeek++;
+            this.startNewDay(isLateNight, { deferToast: true });
+          }
+        },
+        onComplete: () => {
+          if (isSaturday) {
+            this.showWeeklySummaryModal(reason);
+          } else {
+            this._showMorningToast(isLateNight);
+            this.setPlayerEmote('heart', 2.0);
+          }
+        }
+      });
+      return;
+    }
+
     this.events.emit('day:ended', {
       weekNumber: this.weekNumber,
       dayOfWeek: this.dayOfWeek,
@@ -3226,13 +3788,13 @@ class ACSGame {
     if (window.sfx && typeof window.sfx.rest === 'function') window.sfx.rest();
 
     // Saturday night -> Sunday Weekly Summary Turnaround!
-    if (this.dayOfWeek >= 5) {
+    if (isSaturday) {
       this.showWeeklySummaryModal(reason);
       return;
     }
 
     this.dayOfWeek++;
-    this.startNewDay(reason === 'LATE_NIGHT');
+    this.startNewDay(isLateNight);
   }
 
   showCampaignEndingModal() {
@@ -3326,6 +3888,9 @@ class ACSGame {
     document.getElementById('btn-next-week').addEventListener('click', () => {
       this.startNewWeek();
       this.closeOverlays();
+      if (this.animations) {
+        this.animations.playWakeUp();
+      }
     });
   }
 
@@ -3346,7 +3911,17 @@ class ACSGame {
     this.sleepToNextDay(reason);
   }
 
-  startNewDay(lateWake = false) {
+  _showMorningToast(lateWake = false) {
+    const d = this.getCurrentDayData();
+    this.toast(
+      lateWake
+        ? `😴 Você acordou às 07:30 um pouco cansado (Sem. ${this.weekNumber} • ${d.name}). Tome um café em casa!`
+        : `☀️ Semana ${this.weekNumber} • ${d.name} (${d.weekTag || d.title})`,
+      'info'
+    );
+  }
+
+  startNewDay(lateWake = false, { deferToast = false } = {}) {
     this.timeMinutes = lateWake ? (7 * 60 + 30) : (7 * 60);
     this._lastHour = Math.floor(this.timeMinutes / 60);
     this.dailyVisits = 0;
@@ -3382,14 +3957,10 @@ class ACSGame {
     // Wake up inside Casa do ACS!
     this.playerHomeSystem.enterHome(true);
 
-    const d = this.getCurrentDayData();
     this.events.emit('day:started', { weekNumber: this.weekNumber, dayOfWeek: this.dayOfWeek });
-    this.toast(
-      lateWake
-        ? `😴 Você acordou às 07:30 um pouco cansado (Sem. ${this.weekNumber} • ${d.name}). Tome um café em casa!`
-        : `☀️ Semana ${this.weekNumber} • ${d.name} (${d.weekTag || d.title})`,
-      'info'
-    );
+    if (!deferToast) {
+      this._showMorningToast(lateWake);
+    }
     this.renderHotbar();
     this.updateHUD();
     this.navigation.resolveObjective();
@@ -3407,8 +3978,9 @@ class ACSGame {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     // Render active interior scene (Casa do ACS, UBS Interior or Sala ESF)
-    if (this.currentLocation !== 'OVERWORLD' && this.sceneManager) {
+    if (!this.inMainMenu && this.currentLocation !== 'OVERWORLD' && this.sceneManager) {
       this.sceneManager.draw(ctx);
+      if (this.animations) this.animations.drawOverlay();
       return;
     }
 
@@ -3463,11 +4035,12 @@ class ACSGame {
       }
     });
 
-    // Protagonist's Home, Vendinha & Associação buildings
+    // Protagonist's Home, Vendinha, Associação & Casa Misteriosa buildings
     [
       { data: this.playerHome, spriteObj: window.pixelArt.playerHomeSprite, label: '🏡 Casa do ACS', col: '#0369a1' },
       { data: this.vendinha, spriteObj: window.pixelArt.vendinhaSprite, label: '🏪 Vendinha do Zé', col: '#b45309' },
-      { data: this.associacao, spriteObj: window.pixelArt.associacaoSprite, label: '🏛️ Associação', col: '#166534' }
+      { data: this.associacao, spriteObj: window.pixelArt.associacaoSprite, label: '🏛️ Associação', col: '#166534' },
+      { data: this.mysteryHouse, spriteObj: window.pixelArt.mysteryHouseSprite, label: '❓ Casarão Nº 00', col: '#334155' }
     ].forEach(b => {
       if (!b.data || !b.spriteObj) return;
       const bx0 = b.data.x - 80;
@@ -3506,6 +4079,47 @@ class ACSGame {
 
     // Pracinha dos Ipês: 2 Domino Tables & 4 Street Lamps (with evening glow)
     const T = this.TILE;
+    // Campinho de Futebol Goalposts & Soccer Ball (Y-sorted)
+    if (this.campinho) {
+      const midY = this.campinho.y;
+      const leftGoalX = (this.campinho.c1 + 0.7) * T;
+      const rightGoalX = (this.campinho.c2 - 0.7) * T;
+      [
+        { x: leftGoalX, isLeft: true },
+        { x: rightGoalX, isLeft: false }
+      ].forEach(gp => {
+        renderList.push({
+          sortY: midY + 28,
+          draw: () => {
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(Math.round(gp.x - 4), Math.round(midY - 34), 8, 66);
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(Math.round(gp.x - 2), Math.round(midY - 32), 4, 62);
+            ctx.strokeStyle = 'rgba(226, 232, 240, 0.55)';
+            ctx.lineWidth = 1;
+            const netX = gp.isLeft ? gp.x - 16 : gp.x + 2;
+            ctx.strokeRect(Math.round(netX), Math.round(midY - 30), 14, 58);
+          }
+        });
+      });
+      renderList.push({
+        sortY: midY,
+        draw: () => {
+          const bx = Math.round(this.campinho.x);
+          const by = Math.round(midY);
+          ctx.fillStyle = '#1e293b';
+          ctx.beginPath();
+          ctx.arc(bx, by, 7, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#f8fafc';
+          ctx.beginPath();
+          ctx.arc(bx, by, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(bx - 2, by - 2, 4, 4);
+        }
+      });
+    }
     [41 * T, 47 * T].forEach(dx => {
       renderList.push({
         sortY: 48 * T,
@@ -3931,6 +4545,10 @@ class ACSGame {
       this.drawWorldPrompt(ctx, this.nearTarget.x, this.nearTarget.y, this.nearTarget.label);
     }
 
+    if (this.animations) {
+      this.animations.drawWorld(ctx);
+    }
+
     ctx.restore();
 
     // 8. Dynamic Time-of-Day Lighting & Weather Screen Grading!
@@ -3940,6 +4558,11 @@ class ACSGame {
     if (this.sceneManager && this.sceneManager.transitionAlpha > 0) {
       ctx.fillStyle = `rgba(20, 15, 10, ${this.sceneManager.transitionAlpha})`;
       ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    // 10. Fullscreen Cinematic Animation Layer (Sleep Fade, Wake-Up Light, Effects)
+    if (this.animations) {
+      this.animations.drawOverlay();
     }
   }
 
@@ -3968,8 +4591,8 @@ class ACSGame {
       drawEllipticalShadow(this.ubs.x + this.ubs.w * 0.52 + ox, this.ubs.y + this.ubs.h - 10 + oy, 128, 16, 1.05);
     }
 
-    // Community Hubs & Casa do ACS
-    [this.playerHome, this.vendinha, this.associacao].forEach(b => {
+    // Community Hubs, Casa do ACS & Casa Misteriosa
+    [this.playerHome, this.vendinha, this.associacao, this.mysteryHouse].forEach(b => {
       if (!b) return;
       drawEllipticalShadow(b.x + ox * 0.8, b.y - 14 + oy, 76, 12, 1.0);
     });

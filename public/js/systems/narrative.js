@@ -1220,7 +1220,7 @@
         note: 'Ponto de Apoio (Dia 5): Consolidação comunitária no Sul da microárea.',
         choices: [
           {
-            text: 'Brindar a semana incrível com o suco fresco e seguir firme para fechar as 12 visitas no e-SUS!',
+            text: 'Brindar a semana incrível com o suco fresco e seguir firme para fechar a meta semanal no e-SUS!',
             tag: '🥤 Energia Total • 💧 +35 • ⚡ +25 • Vínculo +15',
             type: 'EMPATHY',
             bondDelta: 15,

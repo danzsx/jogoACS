@@ -632,6 +632,13 @@
         }
       }
 
+      if (g.relationships) {
+        const recTarget = cond.receptivityTarget || bondTarget;
+        const currentRec = g.relationships.getContextualReceptivity(recTarget);
+        if (typeof cond.minReceptivity === 'number' && currentRec < cond.minReceptivity) return false;
+        if (typeof cond.maxReceptivity === 'number' && currentRec > cond.maxReceptivity) return false;
+      }
+
       return true;
     }
 
@@ -693,6 +700,20 @@
             fam.bond = global.ACSEngine.clamp(fam.bond + Number(eff.bondDelta[famId] || 0), 5, 100);
           }
         }
+      }
+
+      if (eff.receptivityDelta && typeof eff.receptivityDelta === 'object' && g.relationships) {
+        for (const targetId of Object.keys(eff.receptivityDelta)) {
+          g.relationships.addReceptivity(targetId, eff.receptivityDelta[targetId], 'dialogue_effect');
+        }
+      }
+
+      if (eff.discoverCaseClue && g.investigation) {
+        g.investigation.discoverClue(eff.discoverCaseClue.caseId, eff.discoverCaseClue.clueId);
+      }
+
+      if (eff.resolveCase && g.investigation) {
+        g.investigation.resolveCase(eff.resolveCase.caseId, eff.resolveCase.resolutionId);
       }
 
       if (eff.triggerPhoneMsg && g.phone && typeof g.phone.pushMessage === 'function') {
@@ -813,6 +834,13 @@
           choiceIndex: idx,
           intent: choice.intent || choice.type || 'NEUTRAL'
         });
+      }
+
+      if (g.relationships && session.entityType === 'STAFF') {
+        const targetId = session.currentSpeakerId && session.currentSpeakerId !== 'player'
+          ? session.currentSpeakerId
+          : session.entityId;
+        g.relationships.recordInteraction(targetId, choice, choice.type !== 'AUTHORITARIAN');
       }
 
       if (choice.directAction) {

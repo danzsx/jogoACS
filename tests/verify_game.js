@@ -56,7 +56,7 @@ function createHarness() {
 
   function makeEl(id) {
     const classes = new Set();
-    if (['dialogue-overlay', 'tablet-overlay', 'map-overlay', 'hotbar-tooltip', 'btn-clear-pin'].includes(id)) {
+    if (['dialogue-overlay', 'tablet-overlay', 'notebook-overlay', 'phone-overlay', 'map-overlay', 'hotbar-tooltip', 'btn-clear-pin'].includes(id)) {
       classes.add('hidden');
     }
     const listeners = {};
@@ -94,6 +94,7 @@ function createHarness() {
   const docListeners = {};
   const doc = {
     hidden: false,
+    body: makeEl('body'),
     activeElement: { blur() {} },
     getElementById(id) { if (!els[id]) els[id] = makeEl(id); return els[id]; },
     createElement(tag) { return makeEl(`${tag}_${++elCounter}`); },
@@ -135,6 +136,9 @@ function createHarness() {
     'public/js/systems/navigation.js',
     'public/js/systems/narrative.js',
     'public/js/systems/storyState.js',
+    'public/js/systems/relationships.js',
+    'public/js/systems/investigation.js',
+    'public/js/systems/notebook.js',
     'public/js/systems/dialogue.js',
     'public/js/systems/dialogueResolver.js',
     'public/js/systems/worldState.js',
@@ -154,6 +158,9 @@ function createHarness() {
 
   // Trigger DOMContentLoaded
   (winListeners.DOMContentLoaded || []).forEach(fn => fn());
+  if (win.game) {
+    win.game.inMainMenu = false;
+  }
 
   return {
     win,
@@ -187,6 +194,8 @@ console.log('Running Território Vivo Quality Gate Suite...\n');
 
 test('1. Regression: Frame-1 negative rAF timestamp does NOT crash and renders ACS player', () => {
   const h = createHarness();
+  h.game.closeOverlays();
+  h.game.playerHomeSystem.exitHome();
   h.drawCalls.length = 0;
   // Simulate Chromium vsync timestamp earlier than performance.now() (250.5)
   h.stepFrame(240.0);
@@ -678,7 +687,7 @@ test('16. Phase 2 — Expanded 80x56 Map Spatial Integrity (Vendinha, Pracinha, 
   const h = createHarness();
   const g = h.game;
   g.currentLocation = 'OVERWORLD';
-  assert.strictEqual(g.COLS, 80);
+  assert(g.COLS >= 80);
   assert.strictEqual(g.ROWS, 56);
   assert.strictEqual(g.worldHeight, 56 * 32);
 
@@ -1243,9 +1252,9 @@ test('28. Story Mode H3 — Immediate Visual Prologue Opening, Chapter Banner & 
   const h = createHarness();
   const g = h.game;
 
-  // Clicking "Começar Nova Jornada" must show the chapter banner and launch evt_prologo_abertura immediately
-  const startBtn = h.win.document.getElementById('btn-start-game');
-  startBtn.click();
+  // Starting a new game must show the chapter banner and launch evt_prologo_abertura immediately
+  g.closeOverlays();
+  g.storyEvents.triggerPrologueIntro();
 
   assert(g.storyEvents.activeEvent && g.storyEvents.activeEvent.id === 'evt_prologo_abertura', 'Starting a new game must launch visual Prologue cutscene');
   assert.strictEqual(h.win.document.getElementById('chapter-banner').classList.contains('hidden'), false, 'Chapter banner must display visually');
@@ -1615,6 +1624,205 @@ test('33. Soundtrack & MusicDirector: Independent volumes, contextual tracks, co
   g.closeOverlays();
   md.evaluate({ immediate: true });
   assert.strictEqual(sfx._duckFactor, 1.0, 'Music ducking must restore to 1.0 when overlays close');
+});
+
+test('34. Etapa E1 — RelationshipSystem: Receptivity, Stubbornness, Communication Styles & Cooperation Perks', () => {
+  const h = createHarness();
+  const g = h.game;
+  const rel = g.relationships;
+  assert(rel, 'RelationshipSystem must be initialized');
+
+  // H04 (stubbornness 85) starts with lower receptivity than H01 (stubbornness 0)
+  const h04Rec = rel.getBaseReceptivity('H04');
+  const h01Rec = rel.getBaseReceptivity('H01');
+  assert(h04Rec < h01Rec, 'Resistant families must start with lower receptivity');
+
+  // Contextual receptivity boosts during Dominó gathering on Thursday afternoon
+  g.dayOfWeek = 3; // Thursday
+  g.timeMinutes = 16 * 60;
+  const h04DominoRec = rel.getContextualReceptivity('H04');
+  assert.strictEqual(h04DominoRec, Math.min(100, h04Rec + 12), 'Informal gathering should boost contextual receptivity by +12');
+
+  // Matching preferred style vs averse style
+  const h10 = g.families.find(f => f.id === 'H10'); // preferred: tecnica, averse: pratica
+  const resBad = rel.recordInteraction('H10', { style: 'pratica', type: 'EMPATHY' }, true);
+  assert.strictEqual(resBad.matchedAverse, true);
+  const resGood = rel.recordInteraction('H10', { style: 'tecnica', type: 'EDUCATE' }, true);
+  assert.strictEqual(resGood.matchedPreferred, true);
+  assert.strictEqual(rel.isStyleRevealed('H10'), true, 'Matching preferred style must reveal preference in Notebook');
+
+  // Cooperation perk: Dona Dulce (H01) intercedes with most stubborn neighbor (H10 or H04)
+  const beforeStubborn = h10.stubbornness;
+  const perkRes = rel.usePerk('perk_dulce_intercede');
+  assert.strictEqual(perkRes.ok, true, 'Unlocked Dona Dulce perk should execute cleanly');
+  assert.strictEqual(h10.stubbornness, beforeStubborn - 15, 'Dona Dulce intercession must reduce target stubbornness by 15');
+
+  // Calling same perk twice in one day is blocked
+  const secondTry = rel.usePerk('perk_dulce_intercede');
+  assert.strictEqual(secondTry.ok, false, 'Cooperation perk should have daily cooldown');
+});
+
+test('35. Etapa E1 — NotebookSystem, Home Desk Integration & SaveManager v3 -> v4 Migration', () => {
+  const h = createHarness();
+  const g = h.game;
+  const nb = g.notebook;
+  assert(nb, 'NotebookSystem must be initialized');
+
+  // Home desk station opens Notebook instead of Tablet
+  const desk = g.playerHomeSystem.getStations().find(s => s.id === 'home_desk');
+  assert(desk, 'home_desk station must exist');
+  desk.action();
+  assert.strictEqual(h.win.document.getElementById('notebook-overlay').classList.contains('hidden'), false, 'home_desk must open Notebook');
+  g.closeOverlays();
+
+  // Inspecting a clue adds it to Notebook chronicle & Cases tab
+  g.worldState.inspectClue('clue_mural_ubs');
+  g.closeOverlays();
+  assert(nb.chronicle.some(c => c.title.includes('Mural Interno')), 'Clue inspection must log to Notebook chronicle');
+
+  nb.toggle(true, 'cases');
+  assert(h.win.document.getElementById('notebook-content').innerHTML.includes('Mural Interno'), 'Cases tab must display inspected clues');
+  nb.toggle(true, 'profiles');
+  assert(h.win.document.getElementById('notebook-content').innerHTML.includes('Cooperações Comunitárias'), 'Profiles tab must display cooperation perks');
+  g.closeOverlays();
+
+  // SaveManager v4 round-trip
+  g.relationships.addReceptivity('H04', 10);
+  nb.addNote('H04', 'Gosta de conversar sobre dominó.');
+  assert.strictEqual(g.saveProgress(), true);
+
+  g.relationships.reset();
+  nb.reset();
+  assert.strictEqual(g.loadProgress(), true);
+  assert(nb.notes.H04 && nb.notes.H04.includes('Gosta de conversar sobre dominó.'), 'Notebook notes must persist across save/load');
+
+  // SaveManager v3 -> v4 automatic migration
+  const storage = g.saveManager._getStorage();
+  storage.setItem(g.saveManager.storageKey, JSON.stringify({
+    version: 3,
+    savedAt: Date.now(),
+    data: {
+      weekNumber: 2,
+      dayOfWeek: 1,
+      timeMinutes: 600,
+      storyState: { chapter: 1, storyFlags: { q0_joana_acolheu: true } }
+    }
+  }));
+  const migrated = g.saveManager.load();
+  assert(migrated && migrated.relationships && migrated.notebook && migrated.investigation && migrated.planner && migrated.competencies && migrated.dynamicEvents, 'v3 save must automatically migrate to v4 defaults');
+  assert.strictEqual(migrated.storyState.chapter, 1);
+});
+
+test('36. Etapa E2 — InvestigationSystem: Multi-Source Clues, Contradiction Synthesis, Dialogue Injection & Resolution', () => {
+  const h = createHarness();
+  const g = h.game;
+  const inv = g.investigation;
+  assert(inv, 'InvestigationSystem must be initialized');
+
+  // Caso 1 (A Receita que Não Chega) starts active
+  assert.strictEqual(inv.getCaseState('caso_receita').status, 'active');
+
+  // Talk to Renan (escriturario) -> DialogueResolver injects investigation choice
+  const renan = g.ubsInterior.staff.find(s => s.id === 'escriturario');
+  g.ubsInterior.openStaffDialogue(renan);
+  const renanGraph = g.dialogue.activeSession.graph;
+  const renanStartChoices = renanGraph.nodes[renanGraph.startNode || 'start'].choices;
+  const invRenanChoice = renanStartChoices.find(c => c.next && c.next.startsWith('inv_clue_caso_receita_'));
+  assert(invRenanChoice, 'DialogueResolver must inject investigation clue option into Renan dialogue');
+
+  g.dialogue.selectChoice(renanGraph.startNode || 'start', invRenanChoice, 0);
+  const renanClueNode = renanGraph.nodes[invRenanChoice.next];
+  g.dialogue.selectChoice(invRenanChoice.next, renanClueNode.choices[0], 0);
+  g.closeOverlays();
+  assert.strictEqual(inv.hasClue('caso_receita', 'c1_ubs_registro'), true, 'Renan clue must be recorded');
+
+  // Cannot synthesize yet with only 1 key clue
+  assert.strictEqual(inv.canSynthesizeHypothesis('caso_receita'), false);
+
+  // Talk to Seu Zé (Vendinha) -> collect second contradicting key clue
+  g.communitySpaces.openSeuZeDialogue();
+  const zeGraph = g.dialogue.activeSession.graph;
+  const zeStartKey = zeGraph.startNode || 'start';
+  const zeInvChoice = zeGraph.nodes[zeStartKey].choices.find(c => c.next && c.next.startsWith('inv_clue_caso_receita_'));
+  assert(zeInvChoice, 'DialogueResolver must inject investigation clue option into Seu Zé dialogue');
+  g.dialogue.selectChoice(zeStartKey, zeInvChoice, 0);
+  g.dialogue.selectChoice(zeInvChoice.next, zeGraph.nodes[zeInvChoice.next].choices[0], 0);
+  g.closeOverlays();
+  assert.strictEqual(inv.hasClue('caso_receita', 'c1_vendinha_recados'), true);
+
+  // Now contradiction is detected -> synthesize hypothesis in Notebook
+  assert.strictEqual(inv.canSynthesizeHypothesis('caso_receita'), true, 'Contradiction must be detectable once both key clues are found');
+  assert.strictEqual(inv.synthesizeHypothesis('caso_receita'), true);
+  assert.strictEqual(inv.getCaseState('caso_receita').hypothesisUnlocked, true);
+
+  // Resolution choice [💡 Hipótese] now appears in Seu Zé's dialogue
+  g.communitySpaces.openSeuZeDialogue();
+  const zeResGraph = g.dialogue.activeSession.graph;
+  const zeResStart = zeResGraph.startNode || 'start';
+  const zeResChoice = zeResGraph.nodes[zeResStart].choices.find(c => c.next && c.next.startsWith('inv_res_caso_receita_'));
+  assert(zeResChoice, 'Synthesizing hypothesis must unlock resolution option in dialogue');
+  const neideBefore = g.families.find(f => f.id === 'H05').bond;
+  g.dialogue.selectChoice(zeResStart, zeResChoice, 0);
+  g.dialogue.selectChoice(zeResChoice.next, zeResGraph.nodes[zeResChoice.next].choices[0], 0);
+  g.closeOverlays();
+
+  assert.strictEqual(inv.getCaseState('caso_receita').status, 'resolved');
+  assert.strictEqual(g.storyState.getFlag('caso_receita_via'), 'ponte_vendinha');
+  assert(g.families.find(f => f.id === 'H05').bond > neideBefore, 'Resolving Caso 1 must improve affected family bond');
+
+  // Persistence round-trip
+  assert.strictEqual(g.saveProgress(), true);
+  inv.reset();
+  assert.strictEqual(g.loadProgress(), true);
+  assert.strictEqual(inv.getCaseState('caso_receita').status, 'resolved');
+});
+
+test('37. Expanded Map (120x56) — Bairro Vizinho, Campinho de Futebol & Casa Misteriosa', () => {
+  const h = createHarness();
+  const g = h.game;
+  g.closeOverlays();
+  g.currentLocation = 'OVERWORLD';
+
+  assert.strictEqual(g.COLS, 120, 'Map must be expanded to 120 columns');
+  assert.strictEqual(g.ROWS, 56, 'Map must retain 56 rows');
+  assert.strictEqual(g.worldWidth, 3840);
+
+  // Campinho spatial integrity & interaction
+  assert(g.campinho, 'Campinho de Futebol must exist');
+  assert.strictEqual(g.collides(g.campinho.x, g.campinho.y), false, 'Campinho center must be walkable');
+  const pitchCol = Math.floor(g.campinho.x / 32);
+  const pitchRow = Math.floor(g.campinho.y / 32);
+  assert.strictEqual(g.tileMap[pitchRow][pitchCol], 'G', 'Campinho pitch must be grass');
+
+  g.player.stamina = 60;
+  g.player.x = g.campinho.x;
+  g.player.y = g.campinho.y;
+  g.checkNearbyInteractions();
+  assert.strictEqual(g.nearTarget && g.nearTarget.type, 'CAMPINHO');
+  g.triggerInteraction();
+  assert.strictEqual(g.player.stamina, 68, 'Interacting with Campinho must restore +8 stamina');
+
+  // Casa Misteriosa spatial integrity & investigation dialogue
+  assert(g.mysteryHouse, 'Casa Misteriosa must exist');
+  assert.strictEqual(g.collides(g.mysteryHouse.x, g.mysteryHouse.y), false, 'Casa Misteriosa gate must be walkable');
+  g.player.x = g.mysteryHouse.x;
+  g.player.y = g.mysteryHouse.y;
+  g.checkNearbyInteractions();
+  assert.strictEqual(g.nearTarget && g.nearTarget.type, 'MYSTERY_HOUSE');
+  g.triggerInteraction();
+
+  const mhGraph = g.dialogue.activeSession.graph;
+  assert.strictEqual(mhGraph.startNode, 'portao');
+  g.dialogue.selectChoice('portao', mhGraph.nodes.portao.choices[0], 0);
+  g.dialogue.selectChoice('descoberta', mhGraph.nodes.descoberta.choices[0], 0);
+  g.closeOverlays();
+  assert.strictEqual(g.storyState.hasFlag('mystery_house_inspected'), true);
+
+  // GPS pinning for new landmarks
+  g.navigation.setPin({ type: 'CAMPINHO', id: 'CAMPINHO' });
+  assert.strictEqual(g.navigation.resolveObjective().type, 'CAMPINHO');
+  g.navigation.setPin({ type: 'MYSTERY_HOUSE', id: 'MYSTERY_HOUSE' });
+  assert.strictEqual(g.navigation.resolveObjective().type, 'MYSTERY_HOUSE');
 });
 
 if (!process.exitCode) {

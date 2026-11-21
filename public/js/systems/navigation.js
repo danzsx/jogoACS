@@ -254,6 +254,30 @@
             color: '#16a34a'
           };
           return this.activeObjective;
+        } else if (this.pinnedTarget.type === 'CAMPINHO' && g.campinho) {
+          this.activeObjective = {
+            type: 'CAMPINHO',
+            id: 'CAMPINHO',
+            pinned: true,
+            x: g.campinho.x,
+            y: g.campinho.y,
+            title: '📍 Rota: Campinho de Futebol',
+            sub: 'Bairro Vizinho (Vila Aurora — Leste)',
+            color: '#16a34a'
+          };
+          return this.activeObjective;
+        } else if (this.pinnedTarget.type === 'MYSTERY_HOUSE' && g.mysteryHouse) {
+          this.activeObjective = {
+            type: 'MYSTERY_HOUSE',
+            id: 'MYSTERY_HOUSE',
+            pinned: true,
+            x: g.mysteryHouse.x,
+            y: g.mysteryHouse.y,
+            title: '📍 Rota: Casa Misteriosa',
+            sub: 'Casarão Nº 00 — Bairro Vizinho (Nordeste)',
+            color: '#475569'
+          };
+          return this.activeObjective;
         }
         // Pin became obsolete (e.g. house already visited)
         this.pinnedTarget = null;
@@ -584,6 +608,14 @@
       if (g.horta) {
         ctx.fillStyle = '#84cc16';
         ctx.fillRect(Math.round(g.horta.x * sx) - 4, Math.round(g.horta.y * sy) - 3, 8, 6);
+      }
+      if (g.campinho) {
+        ctx.fillStyle = '#16a34a';
+        ctx.fillRect(Math.round(g.campinho.c1 * 32 * sx), Math.round(g.campinho.r1 * 32 * sy), Math.max(8, Math.round((g.campinho.c2 - g.campinho.c1) * 32 * sx)), Math.max(6, Math.round((g.campinho.r2 - g.campinho.r1) * 32 * sy)));
+      }
+      if (g.mysteryHouse) {
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(Math.round(g.mysteryHouse.x * sx) - 4, Math.round((g.mysteryHouse.y - 32) * sy) - 3, 8, 6);
       }
 
       // Active Dengue spots

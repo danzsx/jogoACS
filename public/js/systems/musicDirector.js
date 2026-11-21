@@ -54,7 +54,7 @@
       });
 
       g.events.on('world:stateChanged', ({ key, value } = {}) => {
-        if ((key === 'pracinhaStatus' && value === 'REVITALIZADA') ||
+        if ((key === 'pracinhaStatus' && (value === 'REVITALIZADA' || value === 'mobilizada' || value === 'celebracao')) ||
             (key === 'hortaStage' && value >= 3)) {
           this.triggerCelebration(18);
         }

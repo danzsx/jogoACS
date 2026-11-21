@@ -1297,6 +1297,14 @@ class PixelArtBank {
       lit: this.makeHouseSprite(assocStyle, roofPalettes.slateWarm, assocStyle.wall, this.shade(assocStyle.wall, -18), this.shade(assocStyle.wall, -38), true, assocFakeFam),
       unlit: this.makeHouseSprite(assocStyle, roofPalettes.slateWarm, assocStyle.wall, this.shade(assocStyle.wall, -18), this.shade(assocStyle.wall, -38), false, assocFakeFam)
     };
+
+    // Casa Misteriosa (Bairro Vizinho)
+    const mysStyle = { wall: '#cbd5e1', trim: '#334155', roof: 'slateWarm', awning: '#475569', garden: false };
+    const mysFakeFam = { tx: 106, ty: 10, archetype: 'TEIMOSO' };
+    this.mysteryHouseSprite = {
+      lit: this.makeHouseSprite(mysStyle, roofPalettes.slateWarm, mysStyle.wall, this.shade(mysStyle.wall, -22), this.shade(mysStyle.wall, -44), false, mysFakeFam),
+      unlit: this.makeHouseSprite(mysStyle, roofPalettes.slateWarm, mysStyle.wall, this.shade(mysStyle.wall, -22), this.shade(mysStyle.wall, -44), false, mysFakeFam)
+    };
   }
 
   makeHouseSprite(style, rpal, wallLight, wallMid, wallDark, isLit, fam) {

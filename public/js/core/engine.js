@@ -155,7 +155,7 @@
   class SaveManager {
     constructor(storageKey = 'territorio_vivo_acs_save_v1') {
       this.storageKey = storageKey;
-      this.schemaVersion = 3;
+      this.schemaVersion = 4;
     }
 
     _getStorage() {
@@ -216,6 +216,30 @@
       };
     }
 
+    migrateV3ToV4(v3) {
+      return {
+        ...v3,
+        relationships: v3.relationships && typeof v3.relationships === 'object'
+          ? v3.relationships
+          : { entities: {}, unlockedPerks: [], usedPerksToday: [] },
+        notebook: v3.notebook && typeof v3.notebook === 'object'
+          ? v3.notebook
+          : { notes: {}, chronicle: [], discoveredStyles: {} },
+        investigation: v3.investigation && typeof v3.investigation === 'object'
+          ? v3.investigation
+          : { cases: {}, clues: [], hypotheses: [] },
+        planner: v3.planner && typeof v3.planner === 'object'
+          ? v3.planner
+          : { route: [], completedStopsToday: [], activeCampaigns: [] },
+        competencies: v3.competencies && typeof v3.competencies === 'object'
+          ? v3.competencies
+          : { xp: {}, levels: {} },
+        dynamicEvents: v3.dynamicEvents && typeof v3.dynamicEvents === 'object'
+          ? v3.dynamicEvents
+          : { active: [], history: [] }
+      };
+    }
+
     save(snapshot) {
       const storage = this._getStorage();
       if (!storage) return false;
@@ -244,10 +268,13 @@
           return null;
         }
         if (parsed.version === 1) {
-          return this.migrateV2ToV3(this.migrateV1ToV2(parsed.data));
+          return this.migrateV3ToV4(this.migrateV2ToV3(this.migrateV1ToV2(parsed.data)));
         }
         if (parsed.version === 2) {
-          return this.migrateV2ToV3(parsed.data);
+          return this.migrateV3ToV4(this.migrateV2ToV3(parsed.data));
+        }
+        if (parsed.version === 3) {
+          return this.migrateV3ToV4(parsed.data);
         }
         if (parsed.version !== this.schemaVersion) {
           return null;

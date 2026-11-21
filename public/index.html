@@ -20,6 +20,11 @@
           <span id="notif-badge" class="notif-badge">1</span>
         </button>
 
+        <button id="btn-notebook" class="wood-icon-btn" title="Caderno de Campo • Pistas, Perfis & Crônica (J)">
+          <span class="journal-excl" style="background:#b45309">📓</span>
+          <span class="journal-label">Caderno</span>
+        </button>
+
         <button id="btn-phone" class="wood-icon-btn" title="Celular Pessoal • Grupo da Vila & Contatos (C)">
           <span class="journal-excl" style="background:#16a34a">📱</span>
           <span class="journal-label">Vila</span>
@@ -154,6 +159,9 @@
       </div>
     </div>
 
+    <!-- FULLSCREEN CINEMATIC ANIMATION LAYER (Sleep Fade, Wake-Up Light, Effects) -->
+    <canvas id="animation-canvas" class="animation-canvas"></canvas>
+
     <!-- TABLET e-SUS TERRITÓRIO MODAL (TAB) -->
     <div id="tablet-overlay" class="modal-overlay hidden">
       <div class="wood-panel tablet-frame">
@@ -171,6 +179,25 @@
           <button id="btn-close-tablet" class="wood-close-btn">✕ ESC</button>
         </div>
         <div id="tablet-content" class="tablet-content"></div>
+      </div>
+    </div>
+
+    <!-- FIELD NOTEBOOK MODAL (J) -->
+    <div id="notebook-overlay" class="modal-overlay hidden">
+      <div class="wood-panel tablet-frame">
+        <div class="tablet-header">
+          <div class="tablet-brand">
+            <span class="sus-pill" style="background:#b45309">📓 CADERNO</span>
+            <strong>Caderno de Campo • Conhecimento & Relações</strong>
+          </div>
+          <div class="tablet-tabs">
+            <button class="notebook-tab-btn tab-btn active" data-notebook-tab="profiles">👥 Perfis & Relações</button>
+            <button class="notebook-tab-btn tab-btn" data-notebook-tab="cases">🔍 Casos & Pistas</button>
+            <button class="notebook-tab-btn tab-btn" data-notebook-tab="chronicle">📓 Crônica da Vila</button>
+          </div>
+          <button id="btn-close-notebook" class="wood-close-btn">✕ ESC</button>
+        </div>
+        <div id="notebook-content" class="tablet-content"></div>
       </div>
     </div>
 
@@ -225,8 +252,91 @@
       </div>
     </div>
 
+    <!-- STARDEW-STYLE MAIN MENU OVERLAY -->
+    <div id="main-menu-overlay" class="main-menu-overlay hidden">
+      <div class="main-menu-frame" aria-hidden="true"></div>
+      <div class="main-menu-vignette" aria-hidden="true"></div>
+
+      <div class="main-menu-content">
+        <header class="main-menu-title-wrap">
+          <div class="main-menu-kicker">TERRITÓRIO VIVO • VILA ESPERANÇA</div>
+          <h1 class="main-menu-title" aria-label="Crônicas de um ACS">
+            <span class="title-line">CRÔNICAS</span>
+            <span class="title-line">DE UM ACS</span>
+          </h1>
+        </header>
+
+        <nav class="parchment-scroll" aria-label="Menu Principal">
+          <div class="scroll-roll scroll-roll-top" aria-hidden="true"></div>
+          <div class="scroll-body">
+            <ul id="main-menu-list" class="main-menu-list">
+              <li>
+                <button class="menu-item-btn" data-action="new" data-index="0">
+                  <span class="menu-hat" aria-hidden="true"></span>
+                  <span class="menu-item-label">Novo Jogo</span>
+                </button>
+              </li>
+              <li>
+                <button class="menu-item-btn" data-action="continue" data-index="1">
+                  <span class="menu-hat" aria-hidden="true"></span>
+                  <span class="menu-item-label">Continuar</span>
+                  <span id="menu-save-meta" class="menu-save-meta hidden"></span>
+                </button>
+              </li>
+              <li>
+                <button class="menu-item-btn" data-action="settings" data-index="2">
+                  <span class="menu-hat" aria-hidden="true"></span>
+                  <span class="menu-item-label">Configurações</span>
+                </button>
+              </li>
+              <li>
+                <button class="menu-item-btn" data-action="credits" data-index="3">
+                  <span class="menu-hat" aria-hidden="true"></span>
+                  <span class="menu-item-label">Créditos</span>
+                </button>
+              </li>
+              <li>
+                <button class="menu-item-btn" data-action="exit" data-index="4">
+                  <span class="menu-hat" aria-hidden="true"></span>
+                  <span class="menu-item-label">Sair</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+          <div class="scroll-roll scroll-roll-bottom" aria-hidden="true"></div>
+        </nav>
+      </div>
+
+      <div class="main-menu-footer">
+        <div class="menu-version-pill">Versão 1.0.1 Beta</div>
+      </div>
+
+      <!-- Pixel-Art Brazil + e-SUS Emblem (Bottom-Right) -->
+      <div class="esus-corner-badge" title="Território Vivo • Atenção Primária à Saúde (SUS)">
+        <svg class="brazil-pixel-svg" viewBox="0 0 24 22" width="54" height="50" shape-rendering="crispEdges" aria-hidden="true">
+          <!-- Outline -->
+          <path fill="#14532d" d="M9 1h6v1h2v1h2v2h2v2h1v4h-1v3h-2v2h-2v2h-2v2h-2v1h-2v-2h-1v-2H8v-2H6v-2H4v-2H2V9h1V7h2V5h2V3h2V1z"/>
+          <!-- Green territory -->
+          <path fill="#16a34a" d="M9 2h6v1h2v1h2v2h2v2h1v3h-1v3h-2v2h-2v2h-2v2h-2v-2h-1v-2H9v-2H7v-2H5v-2H3V9h1V7h2V5h2V3h1V2z"/>
+          <!-- Yellow diamond -->
+          <polygon fill="#facc15" points="12,5 19,10 12,15 5,10"/>
+          <!-- Blue globe -->
+          <rect x="9" y="8" width="6" height="4" fill="#1d4ed8"/>
+          <rect x="10" y="7" width="4" height="6" fill="#1d4ed8"/>
+          <!-- White band -->
+          <rect x="9" y="10" width="6" height="1" fill="#f8fafc"/>
+        </svg>
+        <div class="esus-pill-text">e-SUS</div>
+      </div>
+
+      <!-- Sub-modal for Settings / Credits / Confirm New Game / Exit -->
+      <div id="menu-submodal" class="menu-submodal hidden">
+        <div id="menu-submodal-card" class="wood-panel menu-submodal-card"></div>
+      </div>
+    </div>
+
     <!-- INTRO / DAY SUMMARY MODAL -->
-    <div id="summary-overlay" class="modal-overlay">
+    <div id="summary-overlay" class="modal-overlay hidden">
       <div id="summary-card" class="wood-panel summary-card"></div>
     </div>
   </div>
@@ -237,9 +347,13 @@
   <script src="js/audio.js"></script>
   <script src="js/systems/musicDirector.js"></script>
   <script src="js/systems/sceneManager.js"></script>
+  <script src="js/systems/animations.js"></script>
   <script src="js/systems/navigation.js"></script>
   <script src="js/systems/narrative.js"></script>
   <script src="js/systems/storyState.js"></script>
+  <script src="js/systems/relationships.js"></script>
+  <script src="js/systems/investigation.js"></script>
+  <script src="js/systems/notebook.js"></script>
   <script src="js/systems/dialogue.js"></script>
   <script src="js/systems/dialogueResolver.js"></script>
   <script src="js/systems/worldState.js"></script>

@@ -291,10 +291,14 @@
           y: 5.3 * T,
           radius: 56,
           promptY: 3.7 * T,
-          label: '[E] Caderno do ACS (Semana & Prioridades)',
+          label: '[E] Caderno de Campo (Pistas & Relações)',
           action: () => {
-            this.game.activeTabletTab = 'mission';
-            this.game.toggleTablet(true);
+            if (this.game.notebook) {
+              this.game.notebook.toggle(true);
+            } else {
+              this.game.activeTabletTab = 'mission';
+              this.game.toggleTablet(true);
+            }
           }
         }
       ];
@@ -326,20 +330,40 @@
 
     useBed() {
       const g = this.game;
+      if (g.animations && g.animations.isPlaying('sleep')) return;
+
       if (g.timeMinutes >= 17 * 60) {
         g.sleepToNextDay('SLEEP');
         return;
       }
-      // Nap 1 hour before 17:00
-      g.timeMinutes = Math.min(17 * 60, g.timeMinutes + 60);
-      g.player.stamina = Math.min(100, g.player.stamina + 25);
-      g.setPlayerEmote('heart', 2.2);
+
+      // Nap 1 hour before 17:00 with cozy dim-down / ZzzZzz / brighten animation
+      const applyNap = () => {
+        g.timeMinutes = Math.min(17 * 60, g.timeMinutes + 60);
+        g.player.stamina = Math.min(100, g.player.stamina + 25);
+        g.updateHUD();
+        g.navigation.resolveObjective();
+        g.navigation.updateTrackerUI();
+        g.saveProgress();
+      };
+
+      const finishNap = () => {
+        g.setPlayerEmote('heart', 2.2);
+        g.toast(`😴 Você tirou um cochilo de 1h (${g.formatClock(g.timeMinutes)}) e recuperou +25 Energia!`, 'success');
+      };
+
+      if (g.animations) {
+        g.animations.playSleep({
+          mode: 'NAP',
+          onMidpoint: applyNap,
+          onComplete: finishNap
+        });
+        return;
+      }
+
+      applyNap();
       if (global.sfx && typeof global.sfx.rest === 'function') global.sfx.rest();
-      g.toast(`😴 Você tirou um cochilo de 1h (${g.formatClock(g.timeMinutes)}) e recuperou +25 Energia!`, 'success');
-      g.updateHUD();
-      g.navigation.resolveObjective();
-      g.navigation.updateTrackerUI();
-      g.saveProgress();
+      finishNap();
     }
 
     useClayFilter() {
