@@ -139,6 +139,7 @@ function createHarness() {
     'public/js/systems/relationships.js',
     'public/js/systems/investigation.js',
     'public/js/systems/notebook.js',
+    'public/js/systems/planner.js',
     'public/js/systems/dialogue.js',
     'public/js/systems/dialogueResolver.js',
     'public/js/systems/worldState.js',
@@ -1567,6 +1568,12 @@ test('33. Soundtrack & MusicDirector: Independent volumes, contextual tracks, co
   assert(md, 'MusicDirector should be attached to game');
   assert.strictEqual(md.resolveDesiredContext().track, null, 'Music should be silent before starting game');
 
+  // Main Menu theme music
+  g.inMainMenu = true;
+  md.startMenuMusic();
+  assert.strictEqual(md.resolveDesiredContext().track, 'main_theme', 'Main Menu should play main_theme');
+  g.inMainMenu = false;
+
   // Independent volume controls & persistence
   sfx.setMusicVolume(0.35);
   sfx.setSfxVolume(0.85);
@@ -1823,6 +1830,87 @@ test('37. Expanded Map (120x56) — Bairro Vizinho, Campinho de Futebol & Casa M
   assert.strictEqual(g.navigation.resolveObjective().type, 'CAMPINHO');
   g.navigation.setPin({ type: 'MYSTERY_HOUSE', id: 'MYSTERY_HOUSE' });
   assert.strictEqual(g.navigation.resolveObjective().type, 'MYSTERY_HOUSE');
+});
+
+test('38. Etapa E3 — PlannerSystem: Demands Queue, Route of the Day, Navigation, Visita Preparada & Persistence', () => {
+  const h = createHarness();
+  const g = h.game;
+  const pl = g.planner;
+  assert(pl, 'PlannerSystem must be initialized');
+
+  g.closeOverlays();
+  g.currentLocation = 'OVERWORLD';
+
+  // Demands queue classifies into URGENT, WINDOW, FOLLOWUP
+  const demands = pl.getDemands();
+  assert(demands.length > 0, 'Demands queue must contain active territorial demands');
+  assert(demands.some(d => d.tier === 'URGENT'), 'Demands must include URGENT tier (dengue/cases)');
+  assert(demands.some(d => d.tier === 'WINDOW'), 'Demands must include WINDOW tier (workers/priorities)');
+
+  // Unknown schedule must stay hidden as ??? in planner availability
+  const unknownFam = g.families.find(f => !f.knownSchedule);
+  if (unknownFam) {
+    const avail = pl.getTargetAvailability('HOUSE', unknownFam.id);
+    assert.strictEqual(avail.status, 'UNKNOWN', 'Planner must not spoil unknown schedules');
+  }
+
+  // Build Route of the Day (up to 3 stops) and reorder
+  assert.strictEqual(pl.getMaxStops(), 3);
+  const r1 = pl.addStop({ type: 'HOUSE', refId: 'H01' });
+  const r2 = pl.addStop({ type: 'HOUSE', refId: 'H04' });
+  const r3 = pl.addStop({ type: 'DENGUE', refId: g.dengueSpots[0].id });
+  assert(r1.ok && r2.ok && r3.ok, 'Must allow adding 3 stops to Route of the Day');
+  const r4 = pl.addStop({ type: 'UBS', refId: 'UBS' });
+  assert.strictEqual(r4.ok, false);
+  assert.strictEqual(r4.reason, 'FULL', 'Route must enforce maxStops limit');
+
+  assert.strictEqual(pl.moveStop(1, -1), true, 'Must support reordering stops');
+  assert.strictEqual(pl.route[0].refId, 'H04');
+
+  // NavigationSystem guides to next pending stop when no manual pin is set
+  g.navigation.clearPin();
+  const obj = g.navigation.resolveObjective();
+  assert.strictEqual(obj.fromPlanner, true, 'NavigationSystem must guide to next pending Route stop');
+  assert.strictEqual(obj.id, 'H04');
+
+  // Pausing route falls back to automatic suggestion without deleting route
+  pl.togglePauseRoute(true);
+  const pausedObj = g.navigation.resolveObjective();
+  assert(!pausedObj.fromPlanner, 'Paused route must not override navigation');
+  assert.strictEqual(pl.route.length, 3, 'Pausing must keep route stops intact');
+  pl.togglePauseRoute(false);
+
+  // Tablet Operações & Campanhas tabs render cleanly + Tactical Map draws route
+  g.activeTabletTab = 'mission';
+  g.toggleTablet(true);
+  assert(h.win.document.getElementById('tablet-content').innerHTML.includes('Rota do Dia'), 'Operações tab must render Rota do Dia');
+  g.activeTabletTab = 'campaigns';
+  g.renderTabletContent();
+  assert(h.win.document.getElementById('tablet-content').innerHTML.includes('Canal de Encaminhamento'), 'Campanhas tab must render UBS referrals');
+  g.closeOverlays();
+  g.toggleMap();
+  g.closeOverlays();
+
+  // Visita Preparada bonus on planned stop (no punishment if visiting non-route family)
+  const h04 = g.families.find(f => f.id === 'H04');
+  g.player.stamina = 80;
+  g.timeMinutes = 9 * 60;
+  const startTime = g.timeMinutes;
+  g.resolveVisitChoice(h04, { type: 'EMPATHY', bondDelta: 10, reply: 'Boa conversa!' });
+  assert.strictEqual(g.timeMinutes, startTime + 15, 'Visita Preparada must save 5 min (15 min instead of 20)');
+  assert.strictEqual(g.player.stamina, 84, 'Visita Preparada must grant +4 stamina');
+  assert.strictEqual(pl.route[0].completed, true, 'Completed stop must be marked completed in route');
+  assert.strictEqual(g.navigation.resolveObjective().id, 'H01', 'Navigation must advance to next pending stop');
+
+  // SaveManager v4 round-trip & daily reset
+  assert.strictEqual(g.saveProgress(), true);
+  pl.reset();
+  assert.strictEqual(g.loadProgress(), true);
+  assert.strictEqual(pl.route.length, 3, 'Planned route must persist across save/load');
+  assert.strictEqual(pl.route[0].completed, true, 'Completed stop state must persist across save/load');
+
+  pl.resetDaily();
+  assert.strictEqual(pl.route.length, 0, 'Daily reset must clear previous day route');
 });
 
 if (!process.exitCode) {

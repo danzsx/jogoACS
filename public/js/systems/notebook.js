@@ -217,6 +217,7 @@
           <button class="pin-btn ${this.profileFilter === 'all' ? 'active-filter' : ''}" data-nb-filter="all">Todos</button>
           <button class="pin-btn ${this.profileFilter === 'families' ? 'active-filter' : ''}" data-nb-filter="families">🏠 15 Famílias</button>
           <button class="pin-btn ${this.profileFilter === 'staff' ? 'active-filter' : ''}" data-nb-filter="staff">🏥 Equipe & Lideranças</button>
+          <button class="pin-btn" id="btn-nb-open-planner" style="margin-left:auto;background:#166534;color:#fff">📋 Montar Rota do Dia</button>
         </div>
       `;
 
@@ -303,6 +304,14 @@
           this.render();
         });
       });
+
+      const plannerBtn = document.getElementById('btn-nb-open-planner');
+      if (plannerBtn) {
+        plannerBtn.addEventListener('click', () => {
+          g.activeTabletTab = 'mission';
+          g.toggleTablet(true);
+        });
+      }
 
       content.querySelectorAll('[data-use-perk]').forEach(btn => {
         btn.addEventListener('click', () => {

@@ -170,6 +170,8 @@ class ACSGame {
     this.relationships = window.RelationshipSystem ? new window.RelationshipSystem(this) : null;
     this.investigation = window.InvestigationSystem ? new window.InvestigationSystem(this) : null;
     this.notebook = window.NotebookSystem ? new window.NotebookSystem(this) : null;
+    this.planner = window.PlannerSystem ? new window.PlannerSystem(this) : null;
+    this.familyFilter = 'all';
 
     // Multi-Turn Dialogue System (Phase 1 / H1 v2) & Resolver
     this.dialogue = new window.DialogueSystem(this);
@@ -2648,6 +2650,19 @@ class ACSGame {
       }
     }
 
+    if (ok && this.planner) {
+      const stopRes = this.planner.completeStopByTarget('HOUSE', fam.id);
+      if (stopRes.prepared) {
+        this.timeMinutes = Math.max(7 * 60, this.timeMinutes - 5);
+        this.player.stamina = Math.min(100, this.player.stamina + 4);
+        bondDelta += 2;
+        if (this.relationships) {
+          this.relationships.addReceptivity(fam.id, 5);
+        }
+        relFeedback += ' • 📋 Visita Preparada (-5 min, +4⚡, +5 Rec.)';
+      }
+    }
+
     fam.bond = Math.max(5, Math.min(100, fam.bond + bondDelta));
     if (choice.stubbornDelta) fam.stubbornness = Math.max(0, fam.stubbornness + choice.stubbornDelta);
     if (choice.staminaDelta) this.player.stamina = Math.min(100, this.player.stamina + choice.staminaDelta);
@@ -2849,12 +2864,65 @@ class ACSGame {
         return `${done ? '✅' : '⭐'} <b>${f.code}</b> — ${f.name} (${f.risk})`;
       }).filter(Boolean).join('<br>');
 
+      const pl = this.planner;
+      const maxStops = pl ? pl.getMaxStops() : 3;
+      const feas = pl ? pl.getRouteFeasibility() : { totalMeters: 0, estimatedMinutes: 0, stops: [], weatherAlert: null };
+      const forecast = pl ? pl.getWeatherForecastBlocks() : [];
+      const demands = pl ? pl.getDemands() : [];
+
+      const forecastHtml = forecast.map(b => `<span class="badge" style="margin-right:4px">${b.icon} ${b.range}: ${b.label}</span>`).join('');
+
+      const routeHtml = feas.stops.length > 0
+        ? feas.stops.map((s, idx) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;margin-bottom:5px;border:1px solid #d6b98d;border-radius:6px;background:${s.completed ? '#f0fdf4' : '#fffbeb'}">
+              <div style="font-size:12.5px">
+                <strong>${idx + 1}. ${s.label}</strong> ${s.completed ? '✅' : `<small style="color:#035388">(${s.segmentMeters}m)</small>`}<br>
+                <small style="color:#63432b">${s.availability.text}</small>
+              </div>
+              <div style="display:flex;gap:4px;flex-shrink:0">
+                ${idx > 0 ? `<button class="pin-btn" data-route-move="${idx}:-1" title="Subir">↑</button>` : ''}
+                ${idx < feas.stops.length - 1 ? `<button class="pin-btn" data-route-move="${idx}:1" title="Descer">↓</button>` : ''}
+                <button class="pin-btn" data-route-rm="${s.id}" title="Remover da Rota">✕</button>
+              </div>
+            </div>
+          `).join('')
+        : '<em>Nenhuma parada na Rota do Dia. Escolha até ' + maxStops + ' prioridades abaixo para ganhar bônus de <strong>Visita Preparada</strong> (sem punição se mudar de ideia)!</em>';
+
+      const tierMeta = [
+        { key: 'URGENT', title: '🚨 Urgente / Com Prazo', limit: 4 },
+        { key: 'WINDOW', title: '⏰ Janela de Horário & Prioridades', limit: 5 },
+        { key: 'FOLLOWUP', title: '📋 Acompanhamento / Livre', limit: 4 }
+      ];
+      const demandsHtml = tierMeta.map(tm => {
+        const items = demands.filter(d => d.tier === tm.key).slice(0, tm.limit);
+        if (items.length === 0) return '';
+        return `
+          <div style="margin-top:8px">
+            <strong style="font-size:12.5px;color:#3b200f">${tm.title}</strong>
+            ${items.map(d => `
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:4px 0;border-bottom:1px dashed #d6b98d;font-size:12px">
+                <div>
+                  <strong>${d.label}</strong><br>
+                  <small style="color:#63432b">${d.reason} • ${d.availability.text}</small>
+                </div>
+                ${d.inRoute
+                  ? '<small style="color:#166534;font-weight:800">Na Rota</small>'
+                  : `<button class="pin-btn" data-route-add="${d.type}:${d.refId}">+ Rota</button>`}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }).join('') || '<em>Todas as demandas imediatas foram atendidas hoje!</em>';
+
       c.innerHTML = `
-        <div class="feature-item" style="margin-bottom:14px">
-          <strong style="font-size:17px">📋 Semana ${this.weekNumber} • ${dayData.name} — ${dayData.weekTag || dayData.title}</strong>
-          <p style="margin-top:6px;font-size:14px">${dayData.missionDesc}</p>
-          <p style="margin-top:8px;color:#166534;font-weight:800">⭐ Prioridades da Semana (${prioDone}/${this.weeklyPriorities.length}):</p>
-          <div style="margin-top:4px;font-size:13px">${prioHtml}</div>
+        <div class="feature-item" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+            <strong style="font-size:16px">📋 Semana ${this.weekNumber} • ${dayData.name} — ${dayData.weekTag || dayData.title}</strong>
+            <span style="font-size:12px;color:#035388;font-weight:700">🏥 UBS: ${this.isUBSOpen() ? 'Aberta até 18h' : 'Fechada (Seg–Sex 08h–18h)'}</span>
+          </div>
+          <p style="margin-top:4px;font-size:13px">${dayData.missionDesc}</p>
+          <div style="margin-top:6px;font-size:12px"><strong>🌦️ Previsão:</strong> ${forecastHtml}</div>
+          <div style="margin-top:6px;font-size:12.5px"><strong style="color:#166534">⭐ Prioridades da Semana (${prioDone}/${this.weeklyPriorities.length}):</strong> ${prioHtml}</div>
         </div>
         <div class="kpi-grid">
           <div class="kpi-card">
@@ -2876,18 +2944,28 @@ class ACSGame {
         </div>
         <div class="feature-grid">
           <div class="feature-item">
-            <strong>⏰ Quem está em casa AGORA (${this.formatClock(this.timeMinutes)})?</strong>
-            ${this.families
-              .filter(f => !this.visitedToday.has(f.id) && f.knownSchedule && this.isFamilyAtHome(f))
-              .map(f => `${this.weeklyPriorities.includes(f.id) ? '⭐' : '•'} <b>${f.code}</b> — ${f.name}`).join('<br>') || '<em>Nenhuma casa conhecida pendente em casa neste exato minuto! Descanse num banco (1h) ou explore horários desconhecidos!</em>'}
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+              <strong>🗺️ Rota do Dia (${feas.stops.length}/${maxStops})</strong>
+              <div style="display:flex;gap:4px">
+                ${feas.stops.length > 0 ? `<button id="btn-route-pause" class="pin-btn">${pl && pl.routePaused ? '▶️ Retomar' : '⏸️ Pausar'}</button>` : ''}
+                ${feas.stops.length > 0 ? '<button id="btn-route-clear" class="pin-btn">🗑️ Limpar</button>' : ''}
+              </div>
+            </div>
+            ${feas.stops.length > 0 ? `<div style="font-size:12px;color:#035388;margin-bottom:6px">📏 ~${feas.totalMeters}m • ⏱️ ~${feas.estimatedMinutes} min estimados</div>` : ''}
+            ${feas.weatherAlert ? `<div style="font-size:11.5px;color:#b45309;margin-bottom:6px">${feas.weatherAlert}</div>` : ''}
+            ${routeHtml}
+            <hr style="border:none;border-top:1px dashed #d6b98d;margin:10px 0">
+            <strong>⚙️ Preferências & Controles</strong>
+            <div style="font-size:12px;margin-top:4px">
+              • <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / Setas: Andar • <kbd>E</kbd>: Interagir / Bancos • <kbd>J</kbd>: Caderno<br>
+              <button id="btn-toggle-dlg-hints" class="pin-btn" style="margin-top:6px">
+                ${this.dialogue.showHints ? '👁️ Dicas nos Diálogos: LIGADAS' : '💬 Dicas nos Diálogos: DESLIGADAS (Imersivo)'}
+              </button>
+            </div>
           </div>
           <div class="feature-item">
-            <strong>⚙️ Preferências & Controles</strong>
-            • <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / Setas: Andar • <kbd>E</kbd>: Interagir / Descansar em Bancos<br>
-            • <strong>UBS:</strong> Seg–Sex (08h–18h) • <strong>Casa do ACS:</strong> Dormir após 17h<br>
-            <button id="btn-toggle-dlg-hints" class="pin-btn" style="margin-top:8px">
-              ${this.dialogue.showHints ? '👁️ Dicas Pedagógicas nos Diálogos: LIGADAS' : '💬 Dicas Pedagógicas nos Diálogos: DESLIGADAS (Imersivo)'}
-            </button>
+            <strong>📌 Fila de Demandas do Território</strong>
+            <div style="max-height:280px;overflow-y:auto;margin-top:4px">${demandsHtml}</div>
           </div>
         </div>
       `;
@@ -2900,6 +2978,117 @@ class ACSGame {
           this.renderTabletContent();
         });
       }
+
+      const pauseBtn = document.getElementById('btn-route-pause');
+      if (pauseBtn && pl) {
+        pauseBtn.addEventListener('click', () => {
+          pl.togglePauseRoute();
+          this.saveProgress();
+          this.renderTabletContent();
+        });
+      }
+
+      const clearBtn = document.getElementById('btn-route-clear');
+      if (clearBtn && pl) {
+        clearBtn.addEventListener('click', () => {
+          pl.clearRoute();
+          this.saveProgress();
+          this.renderTabletContent();
+        });
+      }
+
+      c.querySelectorAll('[data-route-add]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!pl) return;
+          const [type, refId] = btn.dataset.routeAdd.split(':');
+          const res = pl.addStop({ type, refId });
+          if (!res.ok && res.reason === 'FULL') {
+            this.toast(`📋 Rota cheia (${res.maxStops} paradas). Remova uma parada para adicionar outra.`, 'warn');
+          } else if (res.ok) {
+            this.toast(`📋 Adicionada à Rota: ${res.stop.label}`, 'info');
+            this.saveProgress();
+          }
+          this.renderTabletContent();
+        });
+      });
+
+      c.querySelectorAll('[data-route-rm]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!pl) return;
+          pl.removeStop(btn.dataset.routeRm);
+          this.saveProgress();
+          this.renderTabletContent();
+        });
+      });
+
+      c.querySelectorAll('[data-route-move]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!pl) return;
+          const [idxStr, deltaStr] = btn.dataset.routeMove.split(':');
+          pl.moveStop(Number(idxStr), Number(deltaStr));
+          this.saveProgress();
+          this.renderTabletContent();
+        });
+      });
+    } else if (this.activeTabletTab === 'campaigns') {
+      const pl = this.planner;
+      const campaigns = pl ? pl.getCampaigns() : [];
+      const referrals = pl ? pl.getUBSReferrals() : [];
+
+      const campHtml = campaigns.map(cp => `
+        <div class="feature-item" style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+            <strong>${cp.title}</strong>
+            <span style="font-size:12px;font-weight:800;color:#035388">${cp.done}/${cp.total} (${cp.pct}%)</span>
+          </div>
+          <div class="mini-progress" style="margin:6px 0"><div class="mini-progress-fill" style="width:${cp.pct}%"></div></div>
+          <div style="font-size:12px;color:#63432b"><strong>Responsável:</strong> ${cp.lead}</div>
+          <div style="font-size:12px;margin-top:2px">${cp.desc}</div>
+        </div>
+      `).join('');
+
+      const refHtml = referrals.map(rf => `
+        <div class="feature-item" style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+            <strong>🩺 ${rf.title}</strong>
+            ${rf.visitedToday
+              ? '<span class="badge amigo">✅ Atendida Hoje</span>'
+              : rf.inRoute
+                ? '<small style="color:#166534;font-weight:800">Na Rota</small>'
+                : `<button class="pin-btn" data-camp-add="HOUSE:${rf.familyId}">+ Rota</button>`}
+          </div>
+          <div style="font-size:12px;color:#035388;margin-top:2px"><strong>Encaminhado por:</strong> ${rf.staffName} (${rf.role}) • ⏰ ${rf.scheduleText}</div>
+          <div style="font-size:12px;color:#475569;margin-top:2px">${rf.note}</div>
+        </div>
+      `).join('');
+
+      c.innerHTML = `
+        <div class="feature-grid">
+          <div>
+            <h3 style="margin:0 0 8px;font-size:15px">📢 Campanhas em Curso na Microárea 04</h3>
+            ${campHtml}
+          </div>
+          <div>
+            <h3 style="margin:0 0 8px;font-size:15px">🏥 Canal de Encaminhamento com a UBS</h3>
+            ${refHtml}
+          </div>
+        </div>
+      `;
+
+      c.querySelectorAll('[data-camp-add]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!pl) return;
+          const [type, refId] = btn.dataset.campAdd.split(':');
+          const res = pl.addStop({ type, refId });
+          if (!res.ok && res.reason === 'FULL') {
+            this.toast(`📋 Rota cheia (${res.maxStops} paradas).`, 'warn');
+          } else if (res.ok) {
+            this.toast(`📋 Encaminhamento adicionado à Rota: ${res.stop.label}`, 'info');
+            this.saveProgress();
+          }
+          this.renderTabletContent();
+        });
+      });
     } else if (this.activeTabletTab === 'story') {
       const chMeta = this.quests ? this.quests.getChapterMeta() : { title: 'Prólogo', desc: '' };
       const dom = this.storyState ? this.storyState.getDominantPosture() : { axis: 'acolhimento', value: 0 };
@@ -2996,7 +3185,25 @@ class ACSGame {
         });
       }
     } else if (this.activeTabletTab === 'families') {
-      const rows = this.families.map(f => {
+      const pl = this.planner;
+      const filter = this.familyFilter || 'all';
+      const filtered = this.families.filter(f => {
+        if (filter === 'pending') return !this.visitedToday.has(f.id);
+        if (filter === 'priority') return this.weeklyPriorities.includes(f.id);
+        if (filter === 'unknown') return !f.knownSchedule;
+        return true;
+      });
+
+      const filterBar = `
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+          <button class="pin-btn ${filter === 'all' ? 'active-filter' : ''}" data-fam-filter="all">Todas (15)</button>
+          <button class="pin-btn ${filter === 'pending' ? 'active-filter' : ''}" data-fam-filter="pending">⏳ Pendentes Hoje</button>
+          <button class="pin-btn ${filter === 'priority' ? 'active-filter' : ''}" data-fam-filter="priority">⭐ Prioridades</button>
+          <button class="pin-btn ${filter === 'unknown' ? 'active-filter' : ''}" data-fam-filter="unknown">❓ Horário ???</button>
+        </div>
+      `;
+
+      const rows = filtered.map(f => {
         const visited = this.visitedToday.has(f.id);
         const loc = this.schedule ? this.schedule.getFamilyLocation(f) : { type: this.isFamilyAtHome(f) ? 'HOME' : 'AWAY', label: '🟢 Em Casa' };
         const statusBadge = visited
@@ -3009,6 +3216,8 @@ class ACSGame {
                 ? '<span class="badge teimoso">🔴 Ausente</span>'
                 : `<span class="badge prioritario">${loc.label}</span>`;
 
+        const inRoute = pl ? pl.isStopInRoute('HOUSE', f.id) : false;
+
         return `
           <tr>
             <td><strong>${f.code}</strong></td>
@@ -3020,14 +3229,17 @@ class ACSGame {
               <strong>${f.bond}%</strong> ${this.renderHearts(f.bond)}
               <div class="mini-progress"><div class="mini-progress-fill" style="width:${f.bond}%"></div></div>
             </td>
-            <td>
-              ${visited ? '<small style="color:#166534;font-weight:800">Concluída</small>' : `<button class="pin-btn" data-pin-house="${f.id}">📍 Rota</button>`}
+            <td style="white-space:nowrap">
+              ${visited
+                ? '<small style="color:#166534;font-weight:800">Concluída</small>'
+                : `<button class="pin-btn" data-pin-house="${f.id}">📍 Pin</button> ${inRoute ? '<small style="color:#166534;font-weight:800">Na Rota</small>' : `<button class="pin-btn" data-fam-route="${f.id}">+ Rota</button>`}`}
             </td>
           </tr>
         `;
       }).join('');
 
       c.innerHTML = `
+        ${filterBar}
         <table class="families-table">
           <thead>
             <tr>
@@ -3037,12 +3249,33 @@ class ACSGame {
               <th>Horário em Casa</th>
               <th>Agora (${this.formatClock(this.timeMinutes)})</th>
               <th>Vínculo</th>
-              <th>GPS</th>
+              <th>GPS / Rota</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
       `;
+
+      c.querySelectorAll('[data-fam-filter]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.familyFilter = btn.dataset.famFilter;
+          this.renderTabletContent();
+        });
+      });
+
+      c.querySelectorAll('[data-fam-route]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!pl) return;
+          const res = pl.addStop({ type: 'HOUSE', refId: btn.dataset.famRoute });
+          if (!res.ok && res.reason === 'FULL') {
+            this.toast(`📋 Rota cheia (${res.maxStops} paradas).`, 'warn');
+          } else if (res.ok) {
+            this.toast(`📋 Adicionada à Rota: ${res.stop.label}`, 'info');
+            this.saveProgress();
+          }
+          this.renderTabletContent();
+        });
+      });
 
       c.querySelectorAll('[data-pin-house]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -3236,6 +3469,42 @@ class ACSGame {
       ctx.fillText(f.code.replace('Casa ', 'C'), (f.x - 32) * sx, (f.y - 45) * sy);
     });
 
+    // Planned Route of the Day (Etapa E3: ① → ② → ③)
+    if (this.planner && this.planner.route.length > 0) {
+      const routePoints = this.planner.route.map(stop => {
+        const coords = this.planner._resolveTargetCoords(stop.type, stop.refId);
+        return {
+          ...stop,
+          rx: (coords ? coords.x : stop.x) * sx,
+          ry: (coords ? coords.y : stop.y) * sy
+        };
+      });
+
+      ctx.save();
+      ctx.strokeStyle = this.planner.routePaused ? '#94a3b8' : '#0284c7';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(this.player.x * sx, this.player.y * sy);
+      routePoints.forEach(pt => ctx.lineTo(pt.rx, pt.ry));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      routePoints.forEach((pt, idx) => {
+        ctx.fillStyle = pt.completed ? '#16a34a' : (this.planner.routePaused ? '#64748b' : '#0284c7');
+        ctx.beginPath();
+        ctx.arc(pt.rx, pt.ry, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 10px Consolas';
+        ctx.fillText(String(idx + 1), pt.rx - 3, pt.ry + 3.5);
+      });
+      ctx.restore();
+    }
+
     // Player pin
     ctx.fillStyle = '#fde047';
     ctx.beginPath();
@@ -3339,6 +3608,7 @@ class ACSGame {
       relationships: this.relationships ? this.relationships.exportState() : null,
       investigation: this.investigation ? this.investigation.exportState() : null,
       notebook: this.notebook ? this.notebook.exportState() : null,
+      planner: this.planner ? this.planner.exportState() : null,
       ubsInterior: this.ubsInterior ? this.ubsInterior.exportState() : null,
       playerHome: this.playerHomeSystem ? this.playerHomeSystem.exportState() : null,
       phone: this.phone ? this.phone.exportState() : null,
@@ -3428,6 +3698,9 @@ class ACSGame {
     if (this.notebook) {
       this.notebook.importState(saved.notebook || null);
     }
+    if (this.planner) {
+      this.planner.importState(saved.planner || null);
+    }
     if (this.quests) {
       this.quests.ensureInitialQuest();
     }
@@ -3467,6 +3740,46 @@ class ACSGame {
     if (summaryOverlay) summaryOverlay.classList.add('hidden');
     if (!menuOverlay) return;
     menuOverlay.classList.remove('hidden');
+
+    if (this.musicDirector && typeof this.musicDirector.startMenuMusic === 'function') {
+      this.musicDirector.startMenuMusic();
+    }
+
+    const updateMenuMusicLabel = () => {
+      const lbl = document.getElementById('menu-music-label');
+      if (!lbl) return;
+      const enabled = !window.sfx || window.sfx.enabled !== false;
+      lbl.textContent = enabled ? 'Tema: Vila Esperança' : 'Tema: Mutado (clique)';
+    };
+    updateMenuMusicLabel();
+
+    if (!this._menuMusicBound) {
+      this._menuMusicBound = true;
+      const musicPill = document.getElementById('menu-music-toggle');
+      if (musicPill) {
+        musicPill.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (window.sfx) {
+            window.sfx.init();
+            window.sfx.toggleMute();
+          }
+          if (this.musicDirector && this.inMainMenu) {
+            this.musicDirector.startMenuMusic();
+          }
+          updateMenuMusicLabel();
+        });
+      }
+      const unlockMenuAudio = () => {
+        if (!this.inMainMenu) return;
+        if (window.sfx) window.sfx.init();
+        if (this.musicDirector && typeof this.musicDirector.startMenuMusic === 'function') {
+          this.musicDirector.startMenuMusic();
+        }
+        updateMenuMusicLabel();
+      };
+      menuOverlay.addEventListener('pointerdown', unlockMenuAudio, { once: true });
+      document.addEventListener('keydown', unlockMenuAudio, { once: true });
+    }
 
     const saved = this.saveManager ? this.saveManager.load() : null;
     const savedDay = saved ? (window.ACS_DATA.days[saved.dayOfWeek ?? saved.dayIndex ?? 0] || window.ACS_DATA.days[0]) : null;
@@ -3932,6 +4245,7 @@ class ACSGame {
     if (this.playerHomeSystem) this.playerHomeSystem.resetDaily();
     if (this.schedule) this.schedule.resetDaily();
     if (this.communitySpaces) this.communitySpaces.resetDaily();
+    if (this.planner) this.planner.resetDaily();
 
     this.player.stamina = lateWake ? 75 : 100;
     this.player.hydration = 100;

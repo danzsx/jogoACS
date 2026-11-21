@@ -341,6 +341,28 @@
         return this.activeObjective;
       }
 
+      // 4.5 Planned Route of the Day (Etapa E3) — guides to next pending stop if no manual pin
+      if (g.planner && !g.planner.routePaused) {
+        const nextStop = g.planner.getNextPendingStop();
+        if (nextStop) {
+          const avail = g.planner.getTargetAvailability(nextStop.type, nextStop.refId);
+          this.activeObjective = {
+            type: nextStop.type,
+            id: nextStop.refId,
+            pinned: false,
+            fromPlanner: true,
+            routeIndex: nextStop.index,
+            routeTotal: g.planner.route.length,
+            x: nextStop.x,
+            y: nextStop.y,
+            title: `📋 Rota ${nextStop.index + 1}/${g.planner.route.length}: ${nextStop.label}`,
+            sub: avail ? avail.text : 'Parada planejada no Tablet [TAB]',
+            color: '#0284c7'
+          };
+          return this.activeObjective;
+        }
+      }
+
       // 5. Weekly Priority family that is unvisited this week, known & at home right now
       const prioritySet = new Set(g.weeklyPriorities || []);
       const unvisitedToday = g.families.filter(f => !g.visitedToday.has(f.id));
@@ -480,7 +502,8 @@
       distEl.style.backgroundColor = obj.color;
 
       if (clearBtn) {
-        clearBtn.classList.toggle('hidden', !obj.pinned);
+        clearBtn.classList.toggle('hidden', !obj.pinned && !obj.fromPlanner);
+        clearBtn.title = obj.pinned ? 'Limpar marcador manual' : (obj.fromPlanner ? 'Pausar Rota do Dia' : '');
       }
     }
 

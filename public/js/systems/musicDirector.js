@@ -21,6 +21,7 @@
     constructor(game) {
       this.game = game;
       this.started = false;
+      this.menuMusicActive = false;
       this.modalMode = null; // null | 'INTRO' | 'WEEKLY_SUMMARY' | 'CAMPAIGN_ENDING'
       this._celebrationTimer = 0;
       this._pendingTrack = undefined;
@@ -66,8 +67,18 @@
       });
     }
 
+    startMenuMusic() {
+      this.menuMusicActive = true;
+      if (global.sfx) {
+        global.sfx.init();
+        global.sfx.preloadTracks(TRACKS);
+      }
+      this.evaluate({ immediate: true, fadeSeconds: 1.8 });
+    }
+
     markStarted() {
       this.started = true;
+      this.menuMusicActive = false;
       this.modalMode = null;
       if (global.sfx) {
         global.sfx.init();
@@ -95,6 +106,9 @@
     // Determines the ideal track (or null for ambient-only silence) and priority
     resolveDesiredContext() {
       const g = this.game;
+      if (g.inMainMenu && this.menuMusicActive && this.modalMode !== 'INTRO') {
+        return { track: 'main_theme', priority: 'HIGH', fadeSeconds: 1.8 };
+      }
       if (!this.started || this.modalMode === 'INTRO') {
         return { track: null, priority: 'HIGH', fadeSeconds: 1.5 };
       }

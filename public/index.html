@@ -252,23 +252,36 @@
       </div>
     </div>
 
-    <!-- STARDEW-STYLE MAIN MENU OVERLAY -->
+    <!-- GRAVEYARD-KEEPER-INSPIRED RUSTIC RPG MAIN MENU OVERLAY -->
     <div id="main-menu-overlay" class="main-menu-overlay hidden">
-      <div class="main-menu-frame" aria-hidden="true"></div>
       <div class="main-menu-vignette" aria-hidden="true"></div>
+      <div class="main-menu-fireflies" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="main-menu-frame" aria-hidden="true"></div>
 
       <div class="main-menu-content">
         <header class="main-menu-title-wrap">
-          <div class="main-menu-kicker">TERRITÓRIO VIVO • VILA ESPERANÇA</div>
-          <h1 class="main-menu-title" aria-label="Crônicas de um ACS">
-            <span class="title-line">CRÔNICAS</span>
-            <span class="title-line">DE UM ACS</span>
-          </h1>
+          <div class="main-menu-crest">
+            <span class="crest-rivet tl" aria-hidden="true"></span>
+            <span class="crest-rivet tr" aria-hidden="true"></span>
+            <span class="crest-rivet bl" aria-hidden="true"></span>
+            <span class="crest-rivet br" aria-hidden="true"></span>
+            <div class="main-menu-kicker">🕯️ TERRITÓRIO VIVO • VILA ESPERANÇA</div>
+            <h1 class="main-menu-title" aria-label="Crônicas de um ACS">
+              <span class="title-line">CRÔNICAS</span>
+              <span class="title-line title-line-accent">DE UM ACS</span>
+            </h1>
+            <div class="main-menu-subtitle">RPG Comunitário • Microárea 04</div>
+          </div>
         </header>
 
-        <nav class="parchment-scroll" aria-label="Menu Principal">
-          <div class="scroll-roll scroll-roll-top" aria-hidden="true"></div>
-          <div class="scroll-body">
+        <nav class="gk-menu-panel" aria-label="Menu Principal">
+          <span class="panel-rivet tl" aria-hidden="true"></span>
+          <span class="panel-rivet tr" aria-hidden="true"></span>
+          <span class="panel-rivet bl" aria-hidden="true"></span>
+          <span class="panel-rivet br" aria-hidden="true"></span>
+          <div class="gk-menu-inner">
             <ul id="main-menu-list" class="main-menu-list">
               <li>
                 <button class="menu-item-btn" data-action="new" data-index="0">
@@ -303,27 +316,32 @@
               </li>
             </ul>
           </div>
-          <div class="scroll-roll scroll-roll-bottom" aria-hidden="true"></div>
         </nav>
+
+        <div class="main-menu-controls-hint">
+          <span><kbd>↑</kbd><kbd>↓</kbd> Navegar</span>
+          <span>•</span>
+          <span><kbd>ENTER</kbd> Confirmar</span>
+        </div>
       </div>
 
+      <button id="menu-music-toggle" class="menu-music-pill" title="Alternar Música Tema de Fundo">
+        <span class="music-eq" aria-hidden="true">🎵</span>
+        <span id="menu-music-label">Tema: Vila Esperança</span>
+      </button>
+
       <div class="main-menu-footer">
-        <div class="menu-version-pill">Versão 1.0.1 Beta</div>
+        <div class="menu-version-pill">Versão 1.1.0 • E0–E3</div>
       </div>
 
       <!-- Pixel-Art Brazil + e-SUS Emblem (Bottom-Right) -->
       <div class="esus-corner-badge" title="Território Vivo • Atenção Primária à Saúde (SUS)">
-        <svg class="brazil-pixel-svg" viewBox="0 0 24 22" width="54" height="50" shape-rendering="crispEdges" aria-hidden="true">
-          <!-- Outline -->
+        <svg class="brazil-pixel-svg" viewBox="0 0 24 22" width="50" height="46" shape-rendering="crispEdges" aria-hidden="true">
           <path fill="#14532d" d="M9 1h6v1h2v1h2v2h2v2h1v4h-1v3h-2v2h-2v2h-2v2h-2v1h-2v-2h-1v-2H8v-2H6v-2H4v-2H2V9h1V7h2V5h2V3h2V1z"/>
-          <!-- Green territory -->
           <path fill="#16a34a" d="M9 2h6v1h2v1h2v2h2v2h1v3h-1v3h-2v2h-2v2h-2v2h-2v-2h-1v-2H9v-2H7v-2H5v-2H3V9h1V7h2V5h2V3h1V2z"/>
-          <!-- Yellow diamond -->
           <polygon fill="#facc15" points="12,5 19,10 12,15 5,10"/>
-          <!-- Blue globe -->
           <rect x="9" y="8" width="6" height="4" fill="#1d4ed8"/>
           <rect x="10" y="7" width="4" height="6" fill="#1d4ed8"/>
-          <!-- White band -->
           <rect x="9" y="10" width="6" height="1" fill="#f8fafc"/>
         </svg>
         <div class="esus-pill-text">e-SUS</div>
@@ -354,6 +372,7 @@
   <script src="js/systems/relationships.js"></script>
   <script src="js/systems/investigation.js"></script>
   <script src="js/systems/notebook.js"></script>
+  <script src="js/systems/planner.js"></script>
   <script src="js/systems/dialogue.js"></script>
   <script src="js/systems/dialogueResolver.js"></script>
   <script src="js/systems/worldState.js"></script>

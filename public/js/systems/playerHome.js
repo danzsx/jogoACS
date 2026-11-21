@@ -291,7 +291,7 @@
           y: 5.3 * T,
           radius: 56,
           promptY: 3.7 * T,
-          label: '[E] Caderno de Campo (Pistas & Relações)',
+          label: '[E] Mesa do ACS (Caderno & Rota do Dia)',
           action: () => {
             if (this.game.notebook) {
               this.game.notebook.toggle(true);
